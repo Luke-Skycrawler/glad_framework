@@ -4,7 +4,7 @@
   "dependencies": [
     "glad",
     "assimp",
-    "glfw",
+    "glfw3",
     "glm"
   ]
 }
