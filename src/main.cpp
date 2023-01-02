@@ -17,7 +17,7 @@ unsigned int depthMapFBO,depthMap;
 static const int SHADOW_WIDTH=800,SHADOW_HEIGHT=600;
 int objectType=0;
 bool model_draw=false,
-    display_corner = true, Motion=false,feedback=false,cursor_hidden=true;
+    display_corner = true, move_light=false,feedback=false,cursor_hidden=true;
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
@@ -54,7 +54,7 @@ int main()
 
     // glfw window creation
     // ------------------------------------------------------------------
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "glad framework", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -84,13 +84,12 @@ int main()
 
     // build and compile our shader programs
     // ------------------------------------------------------------------
-    Shader lightingShader("shaders/1.color.vert", "shaders/1.color.frag");
+    // Shader lightingShader("shaders/cursor/cursor.vert", "shaders/cursor/cursor.frag", shaders/cursor/cursor.geom");
+    Shader lightingShader("shaders/shadow/shadow.vert", "shaders/shadow/shadow.frag");
     unsigned int feedback_vbo=lightingShader.vbo[0],select_xfb=lightingShader.xfb;
     unsigned int select_program=lightingShader.ID;
-    Shader simpleShader("shaders/1.color.vs","shaders/simple.fs");
-    Shader screenShader("shaders/view.vs","shaders/core.fs");
-    Shader depthShader("shaders/1.color.vs","shaders/simple.frag");
-    Shader cornerShader("shaders/view.vs","shaders/core.frag");
+    Shader depthShader("shaders/depth/depth.vert","shaders/depth/depth.frag");
+    Shader cornerShader("shaders/corner/corner.vert","shaders/corner/corner.frag");
     // select buffers setup
     // ------------------------------------------------------------------
     unsigned int tex, buf;
@@ -160,12 +159,7 @@ int main()
     unsigned int diffuseMap = loadTexture("container2.png");
     unsigned int specularMap = loadTexture("container2_specular.png");
 
-    screenShader.use();
-    screenShader.setInt("screenTexture",0);
     cornerShader.setInt("screenTexture",0);
-    unsigned int framebuffer;
-    glGenFramebuffers(1,&framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER,framebuffer);
     
     unsigned int texColorBuffer;
     glGenTextures(1,&texColorBuffer);
@@ -223,10 +217,6 @@ int main()
         // ------------------------------------------------------------------
         // render
         // ------------------------------------------------------------------
-
-        // glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-    
         // be sure to activate shader when setting uniforms/drawing objects
         float scale=1.02;
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 1.0f, 100.0f);
@@ -379,7 +369,7 @@ void gen_preview_framebuffer(){
 // ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow *window)
 {
-    if(Motion){
+    if(move_light){
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
             lightPos+= 2.5f*deltaTime*camera.Front;
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
@@ -406,7 +396,7 @@ void processInput(GLFWwindow *window)
     if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS)
         display_corner=!display_corner;
     if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
-        Motion=!Motion;
+        move_light=!move_light;
     if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS){
         if(cursor_hidden){
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);

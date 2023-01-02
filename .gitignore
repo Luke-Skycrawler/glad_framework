@@ -34,3 +34,7 @@
 /vcpkg
 /builds
 .DS_Store
+
+*.tlog
+*/.vs/
+src/x64/
