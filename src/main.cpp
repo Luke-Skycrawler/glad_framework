@@ -9,15 +9,14 @@
 #include "camera.h"
 #include "mesh.h"
 #include "model.h"
-#include "gl1.h"
+#include "utils.h"
 #include "light.h"
 #include "Object.h"
 
 unsigned int depthMapFBO,depthMap;
 static const int SHADOW_WIDTH=800,SHADOW_HEIGHT=600;
-int objectType=0;
 bool model_draw=false,
-    display_corner = true, move_light=false,feedback=false,cursor_hidden=true;
+    display_corner = true, move_light=false;
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
@@ -64,7 +63,6 @@ int main()
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
-    glfwSetMouseButtonCallback(window,click_callback);
     glfwSetScrollCallback(window, scroll_callback);
 
     // tell GLFW to capture our mouse
@@ -86,8 +84,6 @@ int main()
     // ------------------------------------------------------------------
     // Shader lightingShader("shaders/cursor/cursor.vert", "shaders/cursor/cursor.frag", shaders/cursor/cursor.geom");
     Shader lightingShader("shaders/shadow/shadow.vert", "shaders/shadow/shadow.frag");
-    unsigned int feedback_vbo=lightingShader.vbo[0],select_xfb=lightingShader.xfb;
-    unsigned int select_program=lightingShader.ID;
     Shader depthShader("shaders/depth/depth.vert","shaders/depth/depth.frag");
     Shader cornerShader("shaders/corner/corner.vert","shaders/corner/corner.frag");
     // select buffers setup
@@ -151,13 +147,12 @@ int main()
     glEnableVertexAttribArray(1);
     
     // load models 
-    Model temple("nanosuit/nanosuit.obj");
+    Model bunny("assets/bunny/bunny.obj");
     Light lights(LightPositions,4);
-    // Model temple("mods/gallery/gallery.obj");
     // load textures (we now use a utility function to keep the code more organized)
     // ------------------------------------------------------------------
-    unsigned int diffuseMap = loadTexture("container2.png");
-    unsigned int specularMap = loadTexture("container2_specular.png");
+    unsigned int diffuseMap = loadTexture("assets/wood.png");
+    unsigned int specularMap = loadTexture("assets/wood_specular.png");
 
     cornerShader.setInt("screenTexture",0);
     
@@ -250,7 +245,7 @@ int main()
             renderCube();
             if(model_draw){
                 depthShader.setMat4("model",glm::translate(glm::mat4(1.0f),glm::vec3(0.0f,-1.1f,0.0f)));
-                temple.Draw(depthShader);
+                bunny.Draw(depthShader);
             }
 
             glBindFramebuffer(GL_FRAMEBUFFER,0);
@@ -261,11 +256,6 @@ int main()
         glGetIntegerv(GL_VIEWPORT,viewport);
         lightingShader.use();
         lightingShader.setVec2("pickPosition",glm::vec2(lastX/viewport[2]*2-1.0f,(1-lastY/viewport[3])*2-1.0f));
-        if(feedback){
-            glUseProgram(select_program);
-            glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, select_xfb);
-            glBeginTransformFeedback(GL_TRIANGLES);
-        }
         lightingShader.setMat4("lightView",glm::perspective(glm::radians(89.0f),(float)SHADOW_WIDTH/SHADOW_HEIGHT,0.1f,10.0f)*lightSpaceTrans);
         view = camera.GetViewMatrix();
         lightingShader.setVec3("objectColor", 1.0f, 0.5f, 0.31f);
@@ -304,23 +294,8 @@ int main()
         if(model_draw){
             lightingShader.setInt("alias",2);
             lightingShader.setMat4("model",glm::translate(glm::mat4(1.0f),glm::vec3(0.0f,-1.1f,0.0f)));
-            temple.Draw(lightingShader);
+            bunny.Draw(lightingShader);
         }
-        if(!cursor_hidden&&objectType){
-            model=glm::mat4(glm::mat3(camera.Right,camera.Up,-camera.Front));
-            model=glm::translate(model,camera.Position*glm::mat3(model)+glm::vec3(0.0,0.0,-3.0));
-            lightingShader.setMat4("model",model);
-            renderCube();
-        }
-        if(feedback){
-            glEndTransformFeedback();          
-            int obj;
-            glGetNamedBufferSubData(buf,0,sizeof(int),&obj);
-            std::cout<<obj<<std::endl;
-            glBufferData(GL_TEXTURE_BUFFER, sizeof(int), NULL, GL_DYNAMIC_READ);            
-            glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, 0);
-        }
-
         // also draw the lamp object
         lights.Draw(camera);
         if(display_corner){
@@ -397,15 +372,6 @@ void processInput(GLFWwindow *window)
         display_corner=!display_corner;
     if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
         move_light=!move_light;
-    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS){
-        if(cursor_hidden){
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-            firstMouse=true;
-            glfwSetCursorPos(window,SCR_WIDTH/2,SCR_HEIGHT/2);
-        }  
-        else glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        cursor_hidden=!cursor_hidden;
-    }
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
@@ -415,14 +381,6 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     // make sure the viewport matches the new window dimensions; note that width and 
     // height will be significantly larger than specified on retina displays.
     glViewport(0, 0, width, height);
-}
-
-void click_callback(GLFWwindow* window,int button,int action,int mods){
-    if(cursor_hidden)return;
-    if(glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_LEFT)==GLFW_PRESS)
-        feedback=true;
-    if(glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_LEFT)==GLFW_RELEASE)
-		feedback=false;
 }
 
 // glfw: whenever the mouse moves, this callback is called
@@ -442,20 +400,14 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
     lastX = xpos;
     lastY = ypos;
 
-    if(cursor_hidden)camera.ProcessMouseMovement(xoffset, yoffset);
+    camera.ProcessMouseMovement(xoffset, yoffset);
 }
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
 // ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    if(cursor_hidden)
-        camera.ProcessMouseScroll(yoffset);
-    else {
-        if(yoffset>0)
-            objectType+=yoffset;
-        else objectType=0;
-    }
+    camera.ProcessMouseScroll(yoffset);
 }
 void renderPlane(){
 
@@ -565,106 +517,4 @@ void renderCube(int light){
     glBindVertexArray(light?lightCubeVAO:cubeVAO);
     glDrawArrays(GL_TRIANGLES, 0, 36);
 }
-unsigned int Feedback_Initialize(unsigned int *_vbo,unsigned int *_xfb){
-    static unsigned int xfb,sort_prog,geometry,vert,vbo[2];
-    glGenTransformFeedbacks(1, &xfb);
-    glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, xfb);
 
-    sort_prog = glCreateProgram();
-
-
-    static const char *sort_vs_source =
-            "#version 410\n"
-            "\n"
-            "uniform mat4 model_matrix;\n"
-            "\n"
-            "layout (location = 0) in vec4 position;\n"
-            "layout (location = 1) in vec3 normal;\n"
-            "\n"
-            "out vec3 vs_normal;\n"
-            "\n"
-            "void main(void)\n"
-            "{\n"
-            "    vs_normal = (model_matrix * vec4(normal, 0.0)).xyz;\n"
-            "    gl_Position = model_matrix * position;\n"
-            "}\n";
-
-    static const char *sort_gs_source =
-        "#version 410\n"
-        "\n"
-        "layout (triangles) in;\n"
-        "layout (points, max_vertices = 3) out;\n"
-        "\n"
-        "uniform mat4 projection_matrix;\n"
-        "\n"
-        "in vec3 vs_normal[];\n"
-        "out int selected_alias;\n"
-        "layout (stream = 0) out vec4 rf_position;\n"
-        "layout (stream = 0) out vec3 rf_normal;\n"
-        "\n"
-        "layout (stream = 1) out vec4 lf_position;\n"
-        "layout (stream = 1) out vec3 lf_normal;\n"
-        "\n"
-        "void main(void)\n"
-        "{\n"
-        "    vec4 A = gl_in[0].gl_Position;\n"
-        "    vec4 B = gl_in[1].gl_Position;\n"
-        "    vec4 C = gl_in[2].gl_Position;\n"
-        "    vec3 AB = (B - A).xyz;\n"
-        "    vec3 AC = (C - A).xyz;\n"
-        "    vec3 face_normal = cross(AB, AC);\n"
-        "    int i;\n"
-        "    selected_alias=100;\n"
-        "    if (face_normal.x < 0.0)\n"
-        "    {\n"
-        "        for (i = 0; i < gl_in.length(); i++)\n"
-        "        {\n"
-        "            rf_position = projection_matrix * (gl_in[i].gl_Position - vec4(30.0, 0.0, 0.0, 0.0));\n"
-        "            rf_normal = vs_normal[i];\n"
-        "            EmitStreamVertex(0);\n"
-        "        }\n"
-        "        EndStreamPrimitive(0);\n"
-        "    }\n"
-        "    else\n"
-        "    {\n"
-        "        for (i = 0; i < gl_in.length(); i++)\n"
-        "        {\n"
-        "            lf_position = projection_matrix * (gl_in[i].gl_Position + vec4(30.0, 0.0, 0.0, 0.0));\n"
-        "            lf_normal = vs_normal[i];\n"
-        "            EmitStreamVertex(1);\n"
-        "        }\n"
-        "        EndStreamPrimitive(1);\n"
-        "    }\n"
-        "}\n";
-    geometry = glCreateShader(GL_GEOMETRY_SHADER);
-    vert = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(geometry, 1, &sort_gs_source, NULL);
-    glCompileShader(geometry);
-    glShaderSource(vert, 1, &sort_vs_source, NULL);
-    glCompileShader(vert);
-    glAttachShader(sort_prog,vert);
-    glAttachShader(sort_prog,geometry);
-
-    static const char * varyings[] =
-    {
-        "selected_alias"
-    };
-
-    glTransformFeedbackVaryings(sort_prog, 1, varyings, GL_INTERLEAVED_ATTRIBS);
-
-    glLinkProgram(sort_prog);
-    glUseProgram(sort_prog);
-
-    glGenBuffers(2, vbo);
-
-    for (int i = 0; i < 2; i++){
-        glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, vbo[i]);
-        glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 5 * sizeof(GLfloat), NULL, GL_DYNAMIC_COPY);
-        glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, i, vbo[i]);
-    }
-    if(_xfb){
-        *_vbo=vbo[0];
-        *_xfb=xfb;
-    }
-    return sort_prog;
-}
