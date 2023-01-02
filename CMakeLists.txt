@@ -8,8 +8,6 @@ find_package(glm CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
 
-
-
 set(PROJECT_NAME main)
 
 ################################################################################
@@ -45,8 +43,14 @@ add_executable(${PROJECT_NAME} ${ALL_FILES})
 
 # # main target
 # add_executable(main)
+target_include_directories(main PRIVATE 
+    ${GLM_INCLUDE_DIRS} 
+    ${GLFW3_INCLUDE_DIRS} 
+    ${ASSIMP_INCLUDE_DIRS} 
+    ${GLAD_INCLUDE_DIRS})
+
 target_sources(main PRIVATE ${ALL_FILES})
-target_link_libraries(main PRIVATE glfw3 glad glm assimp)
+target_link_libraries(main PRIVATE glfw assimp::assimp glad::glad glm::glm)
 # set_property(TARGET main PROPERTY CXX_STANDARD 20)
 
 # # tests target
