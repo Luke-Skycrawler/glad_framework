@@ -14,8 +14,7 @@
 
 unsigned int depthMapFBO,depthMap;
 static const int SHADOW_WIDTH=800,SHADOW_HEIGHT=600;
-bool model_draw=false,
-    display_corner = true, move_light=false;
+bool model_draw = true, display_corner = true, move_light = false;
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
@@ -183,6 +182,7 @@ int main()
     lightingShader.setInt("shadowMap",2);
     
     lightingShader.setFloat("material.shininess",64);
+
     // ------------------------------------------------------------------
     // render loop
     // ------------------------------------------------------------------
@@ -219,6 +219,30 @@ int main()
         glm::mat4 tmpmodel=glm::scale(model,glm::vec3(scale,scale,scale));
         glm::vec3 box2Pos(0.3,0.0,1.2);
         glm::mat4 lightSpaceTrans = glm::lookAt(lightPos,glm::vec3(0.0f),camera.WorldUp);
+        const auto renderScene = [&](Shader &shader)
+        {
+            renderPlane();
+            // render one Cube
+            renderCube();
+
+            // translate and render another
+            model = glm::translate(model, box2Pos);
+            shader.setMat4("model", model);
+            renderCube();
+
+            // render bunny
+            shader.setMat4("model", glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)));
+            bunny.Draw(lightingShader);
+
+            // TODO: add rendering code here
+            // ----------------------------------------------------
+
+
+
+
+
+            // ----------------------------------------------------
+        };
         if(display_corner){
             glBindFramebuffer(GL_FRAMEBUFFER,depthMapFBO);
             glEnable(GL_DEPTH_TEST);
@@ -234,19 +258,7 @@ int main()
             depthShader.setMat4("view",lightSpaceTrans);
             depthShader.setMat4("model",model);
             depthShader.setVec3("viewPos",lightPos);
-            // bind diffuse map
-            renderPlane();
-            // render the cube
-            renderCube();
-
-            model = glm::translate(model,box2Pos);
-            depthShader.setMat4("model",model);
-            renderCube();
-            if(model_draw){
-                depthShader.setMat4("model",glm::translate(glm::mat4(1.0f),glm::vec3(0.0f,-1.1f,0.0f)));
-                bunny.Draw(depthShader);
-            }
-
+            renderScene(depthShader);
             glBindFramebuffer(GL_FRAMEBUFFER,0);
             model = glm::mat4(1.0f);
         }
@@ -278,25 +290,10 @@ int main()
             glActiveTexture(GL_TEXTURE2);
             glBindTexture(GL_TEXTURE_2D,depthMap);
         }
-        // FIXME: should do the select pass in reverse order
-        lightingShader.setInt("alias",5);
-        renderPlane();
-        // render the cube
-        lightingShader.setInt("alias",3);
-        renderCube();
-
-        glActiveTexture(GL_TEXTURE0);
-        lightingShader.use();
-        model = glm::translate(model,box2Pos);
-        lightingShader.setMat4("model",model);
-        glDrawArrays(GL_TRIANGLES,0,36);
-        if(model_draw){
-            lightingShader.setInt("alias",2);
-            lightingShader.setMat4("model",glm::translate(glm::mat4(1.0f),glm::vec3(0.0f,-1.1f,0.0f)));
-            bunny.Draw(lightingShader);
-        }
+        renderScene(lightingShader);
         // also draw the lamp object
         lights.Draw(camera);
+
         if(display_corner){
             glBindFramebuffer(GL_FRAMEBUFFER,0);
             glDisable(GL_DEPTH_TEST);
@@ -365,8 +362,8 @@ void processInput(GLFWwindow *window)
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-    if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS)
-        model_draw=!model_draw;
+    // if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS)
+    //     model_draw=!model_draw;
     if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS)
         display_corner=!display_corner;
     if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
@@ -408,6 +405,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
     camera.ProcessMouseScroll(yoffset);
 }
+
 void renderPlane(){
 
     static unsigned int planeVBO,planeVAO=0;

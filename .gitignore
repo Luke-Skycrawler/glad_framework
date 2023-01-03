@@ -33,6 +33,7 @@
 
 /vcpkg
 /builds
+build/
 .DS_Store
 
 *.tlog

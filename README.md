@@ -1,32 +1,58 @@
-[![hosted-ninja-vcpkg_submod-autocache](https://github.com/lukka/CppCMakeVcpkgTemplate/actions/workflows/hosted-ninja-vcpkg_submod.yml/badge.svg)](https://github.com/lukka/CppCMakeVcpkgTemplate/actions/workflows/hosted-ninja-vcpkg_submod.yml)
-[![hosted-pure-workflow](https://github.com/lukka/CppCMakeVcpkgTemplate/actions/workflows/hosted-pure-workflow.yml/badge.svg)](https://github.com/lukka/CppCMakeVcpkgTemplate/actions/workflows/hosted-pure-workflow.yml)
 
-# A C++ project template
+## Windows building
+Make sure you have [`cmake`](https://cmake.org/download/) and `vcpkg` installed. Detailed instructions can be found [here](https://vcpkg.io/en/getting-started.html).
 
-## Content
-This repository contains a `C++` based project template that leverages [vcpkg](https://github.com/microsoft/vcpkg) and [CMake](https://www.cmake.org)'s [CMakePresets.json](https://cmake.org/cmake/help/latest/manual/cmake-presets.7.html) to build and test the source code.
+Navigate to the vcpkg directory, and installed the following packages via vcpkg,
+`vcpkg install glfw3 glad glm assimp`
 
-Supports `Linux`/`macOS`/`Windows` on `x64` and `arm64`.
+Navigate to the root directory `glad_framework`, and type in  
+`cmake -B "build" -S . -DCMAKE_TOOLCHAIN_FILE=[path to vcpkg]/scripts/buildsystems/vcpkg.cmake`
+`cmake --build build`
 
-## Key features:
- - `CMakePresets.json` allows to run the same build either _locally on your IDE_ and on _GitHub runners_.
- - `vcpkg` greatly helps in pulling and building the needed dependencies (e.g. libraries).
+## Linux building
 
-## GitHub Action workflows
+Installing on Linux is roughly the same, with a few dependencies to be installed via the system package manager. On Debian and Ubuntu, those packages can be installed with `apt-get install  libxinerama-dev libxcursor-dev libgl1-mesa-dev xorg-dev`. 
+Also, you must first make sure you have CMake, Git, and GCC by typing as root (`sudo`) `apt-get install g++ cmake git`. 
 
-The repository provides also two GitHub workflows to build the project on [GitHub runners](https://github.com/actions/runner). Both builds and tests the project using `vcpkg` and `CMake`, the only key difference is their implementation:
+With those packages installed, follow the instructions on https://vcpkg.io/en/getting-started.html to install `vcpkg`, then use `vcpkg` to install the packages. Best to do it with `sudo` to suppress possible errors.
+`vcpkg install glfw3 glad glm assimp`
 
- - [hosted-pure-workflow.yml](.github/workflows/hosted-pure-workflow.yml): It is a __pure__ workflow which does not use unneded GitHub Actions that cannot run locally on your development machine. On the other hand it is directly using the `CMake`, `Ninja`, `vcpkg` and the `C++` build tools.
--  [hosted-ninja-vcpkg_submod.yml](.github/workflows/hosted-ninja-vcpkg_submod.yml): It is a concise workflow based on the custom GitHub Actions [get-cmake](https://github.com/lukka/get-cmake), [run-vcpkg](https://github.com/lukka/run-vcpkg) and [run-cmake](https://github.com/lukka/run-cmake) which simplify and shorten the workflow content while adding some goodies like inline error annotations, automatic caching, cache miss fallback strategy and other benefits.
+Next, navigate root directory `glad_framework`, and config the project with
+`cmake -B "build" -S . -DCMAKE_TOOLCHAIN_FILE=[path to vcpkg]/scripts/buildsystems/vcpkg.cmake`.
+and build it with `cmake --build build`.
 
-## Rationale
+## Mac OS X building
+Building on Mac OS X is fairly simple:
+```
+brew install cmake assimp glm glfw freetype
+cmake -S . -B build
+cmake --build build -j$(sysctl -n hw.logicalcpu)
+```
 
-The main idea of this `C++` project template is to show how to obtain a _perfectly reproducible_ software development process that can be run anywhere without any difference and no surprises, either locally using your preferred tools/IDE, either remotely on build agents typically used for continuous integration.
+## Run
+Depending on your build system, the executable directory can differ. Make sure you have all the binaries copied directly under `glad_framework\src` (with `assets\` and `shaders\` in it).  
 
-## Integrated Development Environment (IDE) Support
 
-The major `C++` IDEs should already support `CMakePresets.json` and require no particular configuration. 
+## Code Structure
 
-For example [Visual Studio Code](https://code.visualstudio.com/) with the [CMake Tools extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cmake-tools) let you to open the root folder of this repository, and select in the status bar the CMake preset (e.g. `ninja-multiconfiguration-vcpkg`), as show in the following image:
+The code is hugely based on the awesome [online opengl tutorial](https://learnopengl.com/Getting-started/OpenGL/), and you can refer to their website as documentation of specific code. 
 
-![CMake's preset selection in the status bar of Visual Studio Code](./img/vscode_cmakepresets_selection.png)
+### Load and manipulate models
+We've provided an example in `main.cpp`.
+First, we load a bunny with 
+```C++
+    Model bunny("assets/bunny/bunny.obj");
+```
+Then within the main `while (!glfwWindowShouldClose(window))` loop, we set the model matrix in shaders and call `Model.draw(Shader)` to do the rendering. 
+```C++
+    depthShader.setMat4("model",glm::translate(glm::mat4(1.0f),glm::vec3(0.0f,0.0f,0.0f)));
+    bunny.Draw(depthShader);
+```
+To modify the scene, you can add your code to the lambda expression `renderScene`; 
+
+### Control
+The keyboard control function is defined in `void processInput(GLFWwindow *window)` in `main.cpp`. Currently, the keys `w`, `a`, `s`, `d` are occupied for moving and `l`, `c` are occupied by switching light/camera movement and switching on/off of the upper-right corner display.
+
+
+## Reference
+- [LearnOpenGL](https://github.com/JoeyDeVries/LearnOpenGL)
