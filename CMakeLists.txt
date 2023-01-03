@@ -18,7 +18,6 @@ set(Headers
     "src/light.h"
     "src/mesh.h"
     "src/model.h"
-    "src/Object.h"
     "src/shader.h"
     "src/stb_image.h"
     "src/utils.h"

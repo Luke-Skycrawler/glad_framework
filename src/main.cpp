@@ -11,7 +11,6 @@
 #include "model.h"
 #include "utils.h"
 #include "light.h"
-#include "Object.h"
 
 unsigned int depthMapFBO,depthMap;
 static const int SHADOW_WIDTH=800,SHADOW_HEIGHT=600;
