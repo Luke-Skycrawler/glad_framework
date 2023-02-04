@@ -21,6 +21,9 @@ set(Headers
     "src/shader.h"
     "src/stb_image.h"
     "src/utils.h"
+    "src/cyCore.h"
+    "src/cyTriMesh.h"
+    "src/cyVector.h"
 )
 source_group("Headers" FILES ${Headers})
 

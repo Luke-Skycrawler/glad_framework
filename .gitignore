@@ -39,3 +39,5 @@ build/
 *.tlog
 */.vs/
 src/x64/
+*.pdf
+src/assets/

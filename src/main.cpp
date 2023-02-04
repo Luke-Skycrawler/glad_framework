@@ -11,10 +11,11 @@
 #include "model.h"
 #include "utils.h"
 #include "light.h"
+#include "cyTriMesh.h"
 
 unsigned int depthMapFBO,depthMap;
 static const int SHADOW_WIDTH=800,SHADOW_HEIGHT=600;
-bool model_draw = true, display_corner = true, move_light = false;
+bool model_draw = true, move_light = false;
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
@@ -22,11 +23,12 @@ const unsigned int SCR_HEIGHT = 600;
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
-bool firstMouse = true;
+bool firstMouse = true, right_first = true;
 
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
+    Shader *lightingShader_ptr = nullptr;
 
 // lighting
 glm::vec3 LightPositions[]={
@@ -36,6 +38,59 @@ glm::vec3 LightPositions[]={
     glm::vec3(-1.2f, 2.0f, 0.0f)   
 };
 glm::vec3 &lightPos(LightPositions[0]);
+void char_callback(GLFWwindow *window, unsigned int codepoint)
+{
+    if (codepoint == 246)
+    {
+       
+    }
+}
+
+using namespace cy;
+
+struct shayMesh : public TriMesh
+{
+    shayMesh(const string &filename)
+    {
+        bool success = LoadFromFileObj(filename.data());
+        if (success)
+            cout << "success";
+        else
+            cout << "failed to load";
+        setupMesh();
+    }
+    unsigned vao, vbo, ebo;
+    void setupMesh()
+    {
+        // create buffers/arrays
+        glGenVertexArrays(1, &vao);
+        glGenBuffers(1, &vbo);
+        glGenBuffers(1, &ebo);
+
+        glBindVertexArray(vao);
+        // load data into vertex buffers
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        // A great thing about structs is that their memory layout is sequential for all its items.
+        // The effect is that we can simply pass a pointer to the struct and it translates perfectly to a glm::vec3/2 array which
+        // again translates to 3/2 floats which translates to a byte array.
+        glBufferData(GL_ARRAY_BUFFER, nv * sizeof(Vec3f), v, GL_STATIC_DRAW);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, nf * sizeof(TriFace), f, GL_STATIC_DRAW);
+
+        // set the vertex attribute pointers
+        // vertex Positions
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3f), (void *)0);
+    }
+
+    void draw()
+    {
+        glBindVertexArray(vao);
+        glDrawElements(GL_TRIANGLES, nf * 3, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+    }
+};
 int main()
 {
     // glfw: initialize and configure
@@ -60,8 +115,6 @@ int main()
     }
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-    glfwSetCursorPosCallback(window, mouse_callback);
-    glfwSetScrollCallback(window, scroll_callback);
 
     // tell GLFW to capture our mouse
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -81,9 +134,15 @@ int main()
     // build and compile our shader programs
     // ------------------------------------------------------------------
     // Shader lightingShader("shaders/cursor/cursor.vert", "shaders/cursor/cursor.frag", shaders/cursor/cursor.geom");
-    Shader lightingShader("shaders/shadow/shadow.vert", "shaders/shadow/shadow.frag");
+    // Shader lightingShader("shaders/shadow/shadow.vert", "shaders/shadow/shadow.frag");
+    // Shader _lightingShader("shaders/simple/simple.vert", "shaders/simple/simple.frag");
+    lightingShader_ptr = new Shader("shaders/simple/simple.vert", "shaders/simple/simple.frag");
+    Shader &lightingShader = *lightingShader_ptr;
     Shader depthShader("shaders/depth/depth.vert","shaders/depth/depth.frag");
     Shader cornerShader("shaders/corner/corner.vert","shaders/corner/corner.frag");
+    
+    glfwSetCharCallback(window, char_callback);
+
     // select buffers setup
     // ------------------------------------------------------------------
     unsigned int tex, buf;
@@ -144,9 +203,9 @@ int main()
     glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,4*sizeof(float),(void*)(2*sizeof(float)));
     glEnableVertexAttribArray(1);
     
-    // load models 
-    Model bunny("assets/bunny/bunny.obj");
-    Light lights(LightPositions,4);
+    // load models
+    shayMesh teapot("assets/teapot.obj");
+
     // load textures (we now use a utility function to keep the code more organized)
     // ------------------------------------------------------------------
     unsigned int diffuseMap = loadTexture("assets/wood.png");
@@ -218,62 +277,26 @@ int main()
         glm::mat4 model = glm::mat4(1.0f);
         glm::mat4 tmpmodel=glm::scale(model,glm::vec3(scale,scale,scale));
         glm::vec3 box2Pos(0.3,0.0,1.2);
-        glm::mat4 lightSpaceTrans = glm::lookAt(lightPos,glm::vec3(0.0f),camera.WorldUp);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         const auto renderScene = [&](Shader &shader)
         {
-            renderPlane();
-            // render one Cube
-            renderCube();
-
-            // translate and render another
-            model = glm::translate(model, box2Pos);
-            shader.setMat4("model", model);
-            renderCube();
-
-            // render bunny
-            shader.setMat4("model", glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)));
-            bunny.Draw(lightingShader);
+            // renderCube();
 
             // TODO: add rendering code here
             // ----------------------------------------------------
+            teapot.ComputeBoundingBox();
+            auto c = (teapot.GetBoundMin() + teapot.GetBoundMax()) / 2.0f;
+            model = glm::translate(glm::mat4(1.0f), glm::vec3(c[0], c[1], c[2])) * 0.05f;
 
-
-
-
+            shader.setMat4("model", model);
+            teapot.draw();
 
             // ----------------------------------------------------
         };
-        if(display_corner){
-            glBindFramebuffer(GL_FRAMEBUFFER,depthMapFBO);
-            glEnable(GL_DEPTH_TEST);
-            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-            depthShader.use();
 
-            // view/projection transformations
-            model = glm::mat4(1.0f);
-
-            // depthShader.setMat4("projection",projection);
-            depthShader.setMat4("projection",glm::perspective(glm::radians(89.0f),(float)SHADOW_WIDTH/SHADOW_HEIGHT,0.1f,10.0f));
-            depthShader.setMat4("view",lightSpaceTrans);
-            depthShader.setMat4("model",model);
-            depthShader.setVec3("viewPos",lightPos);
-            renderScene(depthShader);
-            glBindFramebuffer(GL_FRAMEBUFFER,0);
-            model = glm::mat4(1.0f);
-        }
- 
         int viewport[4];
-        glGetIntegerv(GL_VIEWPORT,viewport);
+        glGetIntegerv(GL_VIEWPORT, viewport);
         lightingShader.use();
-        lightingShader.setVec2("pickPosition",glm::vec2(lastX/viewport[2]*2-1.0f,(1-lastY/viewport[3])*2-1.0f));
-        lightingShader.setMat4("lightView",glm::perspective(glm::radians(89.0f),(float)SHADOW_WIDTH/SHADOW_HEIGHT,0.1f,10.0f)*lightSpaceTrans);
-        view = camera.GetViewMatrix();
-        lightingShader.setVec3("objectColor", 1.0f, 0.5f, 0.31f);
-        lightingShader.setVec3("lightColor",  1.0f, 1.0f, 1.0f);
-        lightingShader.setVec3("lightPos",lightPos);
-        lightingShader.setVec3("viewPos",camera.Position);
-        // view/projection transformations
         lightingShader.setMat4("projection", projection);
         lightingShader.setMat4("view", view);
 
@@ -286,23 +309,9 @@ int main()
         // bind specular map
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, specularMap);
-        if(display_corner){
-            glActiveTexture(GL_TEXTURE2);
-            glBindTexture(GL_TEXTURE_2D,depthMap);
-        }
+        // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         renderScene(lightingShader);
-        // also draw the lamp object
-        lights.Draw(camera);
 
-        if(display_corner){
-            glBindFramebuffer(GL_FRAMEBUFFER,0);
-            glDisable(GL_DEPTH_TEST);
-            cornerShader.use();
-            glBindVertexArray(cornerVAO);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D,depthMap);
-            glDrawArrays(GL_TRIANGLES,0,6);
-        }
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // ------------------------------------------------------------------
         glfwSwapBuffers(window);
@@ -319,16 +328,17 @@ int main()
     glfwTerminate();
     return 0;
 }
-void gen_preview_framebuffer(){
-    glGenFramebuffers(1,&depthMapFBO);
+void gen_preview_framebuffer()
+{
+    glGenFramebuffers(1, &depthMapFBO);
     glGenTextures(1, &depthMap);
     glBindTexture(GL_TEXTURE_2D, depthMap);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 
-                SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
+                 SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); 
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
     glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
@@ -340,16 +350,19 @@ void gen_preview_framebuffer(){
 // ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow *window)
 {
-    if(move_light){
+    if (move_light)
+    {
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-            lightPos+= 2.5f*deltaTime*camera.Front;
+            lightPos += 2.5f * deltaTime * camera.Front;
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-            lightPos-= 2.5f*deltaTime*camera.Front;
+            lightPos -= 2.5f * deltaTime * camera.Front;
         if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-            lightPos-= 2.5f*deltaTime*camera.Right;
+            lightPos -= 2.5f * deltaTime * camera.Right;
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-            lightPos+= 2.5f*deltaTime*camera.Right;
-    }else{
+            lightPos += 2.5f * deltaTime * camera.Right;
+    }
+    else
+    {
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
             camera.ProcessKeyboard(FORWARD, deltaTime);
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
@@ -361,49 +374,56 @@ void processInput(GLFWwindow *window)
     }
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+    if (glfwGetKey(window, GLFW_KEY_F6) == GLFW_PRESS) {
+        cout << "Recompiling Shader\n";
+        *lightingShader_ptr = Shader("shaders/simple/simple.vert", "shaders/simple/simple.frag");
+        cout << "Done\n";
 
-    // if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS)
-    //     model_draw=!model_draw;
-    if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS)
-        display_corner=!display_corner;
-    if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
-        move_light=!move_light;
+    }
+
+    bool b1 = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS, b2 = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+    if (b1 || b2)
+    {
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
+        if ((firstMouse && b1) || (right_first && b2))
+        {
+            lastX = xpos;
+            lastY = ypos;
+            if (firstMouse && b1)
+                firstMouse = false;
+            if (right_first && b2)
+                right_first = false;
+        }
+
+        float xoffset = xpos - lastX;
+        float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+
+        lastX = xpos;
+        lastY = ypos;
+
+        if (!b1)
+            firstMouse = true;
+        else
+            camera.ProcessMouseMovement(xoffset, yoffset);
+        if (!b2)
+            right_first = true;
+        else
+            camera.Position += camera.Front * (yoffset * 1e-2f);
+    }
+    else
+    {
+        firstMouse = right_first = true;
+    }
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
 // ---------------------------------------------------------------------------------------------
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+void framebuffer_size_callback(GLFWwindow *window, int width, int height)
 {
-    // make sure the viewport matches the new window dimensions; note that width and 
+    // make sure the viewport matches the new window dimensions; note that width and
     // height will be significantly larger than specified on retina displays.
     glViewport(0, 0, width, height);
-}
-
-// glfw: whenever the mouse moves, this callback is called
-// -------------------------------------------------------
-void mouse_callback(GLFWwindow* window, double xpos, double ypos)
-{
-    if (firstMouse)
-    {
-        lastX = xpos;
-        lastY = ypos;
-        firstMouse = false;
-    }
-
-    float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
-
-    lastX = xpos;
-    lastY = ypos;
-
-    camera.ProcessMouseMovement(xoffset, yoffset);
-}
-
-// glfw: whenever the mouse scroll wheel scrolls, this callback is called
-// ----------------------------------------------------------------------
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
-{
-    camera.ProcessMouseScroll(yoffset);
 }
 
 void renderPlane(){
@@ -514,4 +534,3 @@ void renderCube(int light){
     glBindVertexArray(light?lightCubeVAO:cubeVAO);
     glDrawArrays(GL_TRIANGLES, 0, 36);
 }
-
