@@ -59,29 +59,33 @@ struct shayMesh : public TriMesh
             cout << "failed to load";
         setupMesh();
     }
-    unsigned vao, vbo, ebo;
+    unsigned vao, vbo, ebo, normal_buffer, normal_vao;
     void setupMesh()
     {
+        ComputeNormals();
         // create buffers/arrays
         glGenVertexArrays(1, &vao);
         glGenBuffers(1, &vbo);
         glGenBuffers(1, &ebo);
+        glGenBuffers(1, &normal_buffer);
 
         glBindVertexArray(vao);
-        // load data into vertex buffers
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        // A great thing about structs is that their memory layout is sequential for all its items.
-        // The effect is that we can simply pass a pointer to the struct and it translates perfectly to a glm::vec3/2 array which
-        // again translates to 3/2 floats which translates to a byte array.
-        glBufferData(GL_ARRAY_BUFFER, nv * sizeof(Vec3f), v, GL_STATIC_DRAW);
-
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, nf * sizeof(TriFace), f, GL_STATIC_DRAW);
 
-        // set the vertex attribute pointers
-        // vertex Positions
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, nv * sizeof(Vec3f), v, GL_STATIC_DRAW);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3f), (void *)0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3f), (void*)0);
+
+        glBindBuffer(GL_ARRAY_BUFFER , normal_buffer);
+        glBufferData(GL_ARRAY_BUFFER, nv  * sizeof(Vec3f), vn, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3f), (void *) 0);
+
+
+
+        //glBindVertexArray(0);
     }
 
     void draw()
