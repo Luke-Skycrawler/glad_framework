@@ -12,6 +12,7 @@
 #include "utils.h"
 #include "light.h"
 #include "cyTriMesh.h"
+#include <iostream>
 
 unsigned int depthMapFBO,depthMap;
 static const int SHADOW_WIDTH=800,SHADOW_HEIGHT=600;
@@ -95,7 +96,7 @@ struct shayMesh : public TriMesh
         glBindVertexArray(0);
     }
 };
-int main()
+int main(int argc, char **argv)
 {
     // glfw: initialize and configure
     // ------------------------------------------------------------------
@@ -103,7 +104,8 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
+    string filename(argv[1]);
+    // cin >> filename;
 #ifdef __APPLE__
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
@@ -140,7 +142,8 @@ int main()
     // Shader lightingShader("shaders/cursor/cursor.vert", "shaders/cursor/cursor.frag", shaders/cursor/cursor.geom");
     // Shader lightingShader("shaders/shadow/shadow.vert", "shaders/shadow/shadow.frag");
     // Shader _lightingShader("shaders/simple/simple.vert", "shaders/simple/simple.frag");
-    lightingShader_ptr = new Shader("shaders/simple/simple.vert", "shaders/simple/simple.frag");
+    // lightingShader_ptr = new Shader("shaders/simple/simple.vert", "shaders/simple/simple.frag");
+    lightingShader_ptr = new Shader("shaders/shadow/shadow.vert", "shaders/shadow/shadow.frag");
     Shader &lightingShader = *lightingShader_ptr;
     Shader depthShader("shaders/depth/depth.vert","shaders/depth/depth.frag");
     Shader cornerShader("shaders/corner/corner.vert","shaders/corner/corner.frag");
@@ -208,12 +211,14 @@ int main()
     glEnableVertexAttribArray(1);
     
     // load models
-    shayMesh teapot("assets/teapot.obj");
+    // shayMesh teapot("assets/teapot/teapot.obj");
+    // Model teapot("assets/teapot/teapot.obj");
+    Model teapot(filename);
 
     // load textures (we now use a utility function to keep the code more organized)
     // ------------------------------------------------------------------
-    unsigned int diffuseMap = loadTexture("assets/wood.png");
-    unsigned int specularMap = loadTexture("assets/wood_specular.png");
+    unsigned int diffuseMap = loadTexture("assets/teapot/brick.png");
+    unsigned int specularMap = loadTexture("assets/teapot/brick-specular.png");
 
     cornerShader.setInt("screenTexture",0);
     
@@ -244,7 +249,7 @@ int main()
     lightingShader.setInt("material.specular", 1);
     lightingShader.setInt("shadowMap",2);
     
-    lightingShader.setFloat("material.shininess",64);
+    lightingShader.setFloat("material.shininess",2);
 
     // ------------------------------------------------------------------
     // render loop
@@ -288,13 +293,13 @@ int main()
 
             // TODO: add rendering code here
             // ----------------------------------------------------
-            teapot.ComputeBoundingBox();
-            auto c = (teapot.GetBoundMin() + teapot.GetBoundMax()) / 2.0f;
-            model = glm::translate(glm::mat4(1.0f), glm::vec3(c[0], c[1], c[2])) * 0.05f;
-
+            //teapot.ComputeBoundingBox();
+            //auto c = (teapot.GetBoundMin() + teapot.GetBoundMax()) / 2.0f;
+            model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f)) * 0.05f;
+            
             shader.setMat4("model", model);
-            teapot.draw();
-
+            //teapot.draw();
+            teapot.Draw(shader);
             // ----------------------------------------------------
         };
 
@@ -306,6 +311,14 @@ int main()
         lightingShader.setVec3("light_color", glm::vec3(1.0f));
         lightingShader.setVec3("view_pos", camera.Position);
         lightingShader.setVec3("light_pos", lightPos);
+        glm::mat4 lightSpaceTrans = glm::lookAt(lightPos, glm::vec3(0.0f), camera.WorldUp);
+
+         lightingShader.setMat4("lightView",glm::perspective(glm::radians(89.0f),(float)SHADOW_WIDTH/SHADOW_HEIGHT,0.1f,10.0f)*lightSpaceTrans);
+        view = camera.GetViewMatrix();
+        lightingShader.setVec3("objectColor", 1.0f, 0.5f, 0.31f);
+        lightingShader.setVec3("lightColor",  1.0f, 1.0f, 1.0f);
+        lightingShader.setVec3("lightPos",lightPos);
+        
         // world transformation
         lightingShader.setMat4("model", model);
 
