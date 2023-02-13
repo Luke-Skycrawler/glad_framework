@@ -303,7 +303,9 @@ int main()
         lightingShader.use();
         lightingShader.setMat4("projection", projection);
         lightingShader.setMat4("view", view);
-
+        lightingShader.setVec3("light_color", glm::vec3(1.0f));
+        lightingShader.setVec3("view_pos", camera.Position);
+        lightingShader.setVec3("light_pos", lightPos);
         // world transformation
         lightingShader.setMat4("model", model);
 
@@ -354,6 +356,8 @@ void gen_preview_framebuffer()
 // ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow *window)
 {
+    move_light = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+
     if (move_light)
     {
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
@@ -409,11 +413,27 @@ void processInput(GLFWwindow *window)
         if (!b1)
             firstMouse = true;
         else
-            camera.ProcessMouseMovement(xoffset, yoffset);
+        {
+            if (move_light)
+            {
+                glm::mat3 view {camera.GetViewMatrix()};
+                lightPos += glm::vec3(view[0]) * xoffset * 1e-2f;
+                lightPos += glm::vec3(view[1]) * yoffset * 1e-2f;
+            }
+            else
+                camera.ProcessMouseMovement(xoffset, yoffset);
+        }
         if (!b2)
             right_first = true;
         else
-            camera.Position += camera.Front * (yoffset * 1e-2f);
+        {
+            if (move_light)
+            {
+                lightPos += camera.Front * (yoffset * 1e-2f);
+            }
+            else
+                camera.Position += camera.Front * (yoffset * 1e-2f);
+        }
     }
     else
     {
