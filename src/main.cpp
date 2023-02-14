@@ -48,7 +48,8 @@ void char_callback(GLFWwindow *window, unsigned int codepoint)
 }
 
 using namespace cy;
-
+using namespace std;
+using namespace glm;
 struct shayMesh : public TriMesh
 {
     shayMesh(const string &filename)
@@ -258,6 +259,17 @@ int main(int argc, char **argv)
     }
     glBindFramebuffer(GL_FRAMEBUFFER,0);
 
+    Shader skyboxShader("shaders/skycube.vs", "shaders/skycube.fs");
+
+    vector<string> faces_files{
+        "assets/cubemap/cubemap_posx.png",
+        "assets/cubemap/cubemap_negx.png",
+        "assets/cubemap/cubemap_posy.png",
+        "assets/cubemap/cubemap_negy.png",
+        "assets/cubemap/cubemap_posz.png",
+        "assets/cubemap/cubemap_negz.png",
+    };
+    unsigned cubemap_texture = loadCubemap(faces_files);
     gen_preview_framebuffer();
     // ------------------------------------------------------------------
     // shader configuration
@@ -284,7 +296,11 @@ int main(int argc, char **argv)
         // input
         processInput(window);
         // render setup
+        #ifdef _TO_FRAMEBUFFER_
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+        #else
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        #endif
         glClearColor(0.1f,0.1f,0.1f,1.0f);
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_STENCIL_TEST);
@@ -353,7 +369,24 @@ int main(int argc, char **argv)
         // renderScene(lightingShader);
 
         renderScene(lightingShader);
-
+        {
+            glStencilMask(0x00);
+            // skybox
+            // glDepthMask(GL_FALSE);
+            glm::mat4 skyview = glm::mat4(glm::mat3(view));
+            glDepthFunc(GL_LEQUAL);
+            skyboxShader.use();
+            skyboxShader.setMat4("projection", projection);
+            skyboxShader.setMat4("view", skyview);
+            // glBindVertexArray();
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture);
+            // glDrawArrays(GL_TRIANGLES, 0, 36);
+            // glDepthMask(GL_TRUE);
+            renderCube();
+            glDepthFunc(GL_LESS);
+        }
+#ifdef _TO_FRAMEBUFFER_
         {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             glDisable(GL_DEPTH_TEST);
@@ -368,6 +401,7 @@ int main(int argc, char **argv)
             glBindTexture(GL_TEXTURE_2D, texColorBuffer);
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
+        #endif
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // ------------------------------------------------------------------
