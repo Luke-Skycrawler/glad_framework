@@ -104,7 +104,8 @@ int main(int argc, char **argv)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    string filename(argv[1]);
+    // string filename(argv[1]);
+    string filename = "assets/teapot/teapot.obj";
     // cin >> filename;
 #ifdef __APPLE__
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
@@ -147,6 +148,7 @@ int main(int argc, char **argv)
     Shader &lightingShader = *lightingShader_ptr;
     Shader depthShader("shaders/depth/depth.vert","shaders/depth/depth.frag");
     Shader cornerShader("shaders/corner/corner.vert","shaders/corner/corner.frag");
+    Shader screenShader("shaders/screen/screen.vert", "shaders/screen/screen.frag");
     
     glfwSetCharCallback(window, char_callback);
 
@@ -179,14 +181,13 @@ int main(int argc, char **argv)
          1.0f,  0.5f,  1.0f, 0.0f,
          1.0f,  1.0f,  1.0f, 1.0f
     };
-    float quad[]={
-        -1.0f,  1.0f,  0.0f, 1.0f,
-        -1.0f, -1.0f,  0.0f, 0.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
-        -1.0f,  1.0f,  0.0f, 1.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
-         1.0f,  1.0f,  1.0f, 1.0f
-    };
+    float quad[] = {
+        0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
+        0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+        1.0f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,
+        0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
+        1.0f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,
+        1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f};
     glGenVertexArrays(1, &quadVAO);
     glGenBuffers(1, &quadVBO);
     
@@ -194,10 +195,13 @@ int main(int argc, char **argv)
     glBindVertexArray(quadVAO);
     glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(quad), &quad, GL_STATIC_DRAW);
-    glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,4*sizeof(float),(void*)0);
+    // glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,4*sizeof(float),(void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)0);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,4*sizeof(float),(void*)(2*sizeof(float)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
 
     unsigned int cornerVAO,cornerVBO;
     glGenVertexArrays(1, &cornerVAO);
@@ -221,23 +225,31 @@ int main(int argc, char **argv)
     unsigned int specularMap = loadTexture("assets/teapot/brick-specular.png");
 
     cornerShader.setInt("screenTexture",0);
-    
-    unsigned int texColorBuffer;
-    glGenTextures(1,&texColorBuffer);
-    glBindTexture(GL_TEXTURE_2D,texColorBuffer);
-    glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,SCR_WIDTH,SCR_HEIGHT,0,GL_RGB,GL_UNSIGNED_BYTE,NULL);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,texColorBuffer,0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_STENCIL_ATTACHMENT,GL_TEXTURE_2D,texColorBuffer,0);
 
+    unsigned framebuffer;
+    unsigned int texColorBuffer;
     unsigned int rbo;
-    glGenRenderbuffers(1,&rbo);
-    glBindRenderbuffer(GL_RENDERBUFFER,rbo);
-    glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH24_STENCIL8,SCR_WIDTH,SCR_HEIGHT);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_STENCIL_ATTACHMENT,GL_RENDERBUFFER,rbo);
-    if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE)
-        std::cout<<"error: framebuffer\n";
+
+    lightingShader.use();
+    lightingShader.setInt("material.diffuse", 0);
+    glGenFramebuffers(1, &framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    {
+        glGenTextures(1, &texColorBuffer);
+        glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, texColorBuffer, 0);
+
+        glGenRenderbuffers(1, &rbo);
+        glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+            std::cout << "error: framebuffer\n";
+    }
     glBindFramebuffer(GL_FRAMEBUFFER,0);
 
     gen_preview_framebuffer();
@@ -266,7 +278,7 @@ int main(int argc, char **argv)
         // input
         processInput(window);
         // render setup
-        glBindFramebuffer(GL_FRAMEBUFFER,0);
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glClearColor(0.1f,0.1f,0.1f,1.0f);
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_STENCIL_TEST);
@@ -307,7 +319,10 @@ int main(int argc, char **argv)
         glGetIntegerv(GL_VIEWPORT, viewport);
         lightingShader.use();
         lightingShader.setMat4("projection", projection);
-        lightingShader.setMat4("view", view);
+        glm::vec3 camera_init_pos(0.0f, 0.0f, 3.0f);
+
+        lightingShader.setMat4("view", glm::lookAt(camera_init_pos, glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
+
         lightingShader.setVec3("light_color", glm::vec3(1.0f));
         lightingShader.setVec3("view_pos", camera.Position);
         lightingShader.setVec3("light_pos", lightPos);
@@ -329,7 +344,24 @@ int main(int argc, char **argv)
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, specularMap);
         // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        // renderScene(lightingShader);
+
         renderScene(lightingShader);
+
+        {
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glDisable(GL_DEPTH_TEST);
+            glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+            lightingShader.use();
+            lightingShader.setMat4("model", glm::mat4(1.0f));
+            lightingShader.setMat4("projection", projection);
+            lightingShader.setMat4("view", camera.GetViewMatrix());
+            glBindVertexArray(quadVAO);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // ------------------------------------------------------------------
