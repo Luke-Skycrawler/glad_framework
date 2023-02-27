@@ -7,6 +7,7 @@ out vec3 FragPos;
 out vec3 Normal;
 out vec2 TexCoords;
 out vec4 FragPosLightSpace;
+out vec3 CubeMapCoords;
 
 uniform mat4 model;
 uniform mat4 view;
@@ -19,4 +20,5 @@ void main()
     TexCoords = aTexCoords;
     FragPosLightSpace = lightView * vec4(FragPos,1.0);
     gl_Position = projection * view * vec4(FragPos, 1.0);
+    CubeMapCoords = mat3(model) * aPos;
 }

@@ -331,6 +331,7 @@ int main(int argc, char **argv)
             //auto c = (teapot.GetBoundMin() + teapot.GetBoundMax()) / 2.0f;
 
             model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f)) * 0.05f;
+            // model = glm::mat4(1.0f);
             shader.setMat4("view", view);
             shader.setMat4("model", model);
             // teapot.draw();
@@ -364,7 +365,7 @@ int main(int argc, char **argv)
         glActiveTexture(GL_TEXTURE2);
         // glBindTexture(GL_TEXTURE_2D, diffuseMap);
         glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture);
-        lightingShader.setInt("material.diffuse", 2);
+        lightingShader.setInt("skybox", 2);
         // bind specular map
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, specularMap);
