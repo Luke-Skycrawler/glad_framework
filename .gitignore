@@ -41,3 +41,4 @@ build/
 src/x64/
 *.pdf
 src/assets/
+*.zip

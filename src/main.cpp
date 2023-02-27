@@ -106,7 +106,7 @@ int main(int argc, char **argv)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     // string filename(argv[1]);
-    string filename = "assets/teapot/teapot.obj";
+    string filename = "../src/assets/sphere.obj";
     // cin >> filename;
 #ifdef __APPLE__
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
@@ -141,15 +141,15 @@ int main(int argc, char **argv)
 
     // build and compile our shader programs
     // ------------------------------------------------------------------
-    // Shader lightingShader("shaders/cursor/cursor.vert", "shaders/cursor/cursor.frag", shaders/cursor/cursor.geom");
-    // Shader lightingShader("shaders/shadow/shadow.vert", "shaders/shadow/shadow.frag");
-    // Shader _lightingShader("shaders/simple/simple.vert", "shaders/simple/simple.frag");
-    // lightingShader_ptr = new Shader("shaders/simple/simple.vert", "shaders/simple/simple.frag");
-    lightingShader_ptr = new Shader("shaders/shadow/shadow.vert", "shaders/shadow/shadow.frag");
+    // Shader lightingShader("../src/shaders/cursor/cursor.vert", "../src/shaders/cursor/cursor.frag", ../src/shaders/cursor/cursor.geom");
+    // Shader lightingShader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/shadow.frag");
+    // Shader _lightingShader("../src/shaders/simple/simple.vert", "../src/shaders/simple/simple.frag");
+    // lightingShader_ptr = new Shader("../src/shaders/simple/simple.vert", "../src/shaders/simple/simple.frag");
+    lightingShader_ptr = new Shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/shadow.frag");
     Shader &lightingShader = *lightingShader_ptr;
-    Shader depthShader("shaders/depth/depth.vert","shaders/depth/depth.frag");
-    Shader cornerShader("shaders/corner/corner.vert","shaders/corner/corner.frag");
-    Shader screenShader("shaders/screen/screen.vert", "shaders/screen/screen.frag");
+    Shader depthShader("../src/shaders/depth/depth.vert","../src/shaders/depth/depth.frag");
+    Shader cornerShader("../src/shaders/corner/corner.vert","../src/shaders/corner/corner.frag");
+    Shader screenShader("../src/shaders/screen/screen.vert", "../src/shaders/screen/screen.frag");
     
     glfwSetCharCallback(window, char_callback);
 
@@ -259,7 +259,7 @@ int main(int argc, char **argv)
     }
     glBindFramebuffer(GL_FRAMEBUFFER,0);
 
-    Shader skyboxShader("shaders/skycube.vs", "shaders/skycube.fs");
+    Shader skyboxShader("../src/shaders/skycube.vs", "../src/shaders/skycube.fs");
 
     vector<string> faces_files{
         "assets/cubemap/cubemap_posx.png",
@@ -329,10 +329,11 @@ int main(int argc, char **argv)
             // ----------------------------------------------------
             //teapot.ComputeBoundingBox();
             //auto c = (teapot.GetBoundMin() + teapot.GetBoundMax()) / 2.0f;
+
             model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f)) * 0.05f;
-            
+            shader.setMat4("view", view);
             shader.setMat4("model", model);
-            //teapot.draw();
+            // teapot.draw();
             teapot.Draw(shader);
             // ----------------------------------------------------
         };
@@ -345,7 +346,7 @@ int main(int argc, char **argv)
 
         lightingShader.setMat4("view", glm::lookAt(camera_init_pos, glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
 
-        lightingShader.setVec3("light_color", glm::vec3(1.0f));
+        lightingShader.setVec3("light_color", glm::vec3(0.8f));
         lightingShader.setVec3("view_pos", camera.Position);
         lightingShader.setVec3("light_pos", lightPos);
         glm::mat4 lightSpaceTrans = glm::lookAt(lightPos, glm::vec3(0.0f), camera.WorldUp);
@@ -360,8 +361,10 @@ int main(int argc, char **argv)
         lightingShader.setMat4("model", model);
 
         // bind diffuse map
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, diffuseMap);
+        glActiveTexture(GL_TEXTURE2);
+        // glBindTexture(GL_TEXTURE_2D, diffuseMap);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture);
+        lightingShader.setInt("material.diffuse", 2);
         // bind specular map
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, specularMap);
@@ -469,7 +472,8 @@ void processInput(GLFWwindow *window)
         glfwSetWindowShouldClose(window, true);
     if (glfwGetKey(window, GLFW_KEY_F6) == GLFW_PRESS) {
         cout << "Recompiling Shader\n";
-        *lightingShader_ptr = Shader("shaders/simple/simple.vert", "shaders/simple/simple.frag");
+        // *lightingShader_ptr = Shader("../src/shaders/simple/simple.vert", "../src/shaders/simple/simple.frag");
+        *lightingShader_ptr = Shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/shadow.frag");
         cout << "Done\n";
 
     }
