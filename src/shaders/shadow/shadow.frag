@@ -37,6 +37,7 @@ in vec3 CubeMapCoords;
 void main()
 {
     vec3 normal = transpose(inverse(mat3(view))) * Normal;
+    // vec3 normal = transpose(inverse(mat3(view))) * Normal;
     // vec3 normal = Normal;
     normal = normalize(normal);
     // vec3 view_dir = normalize(vec3(view as* vec4(view_pos, 1)) - FragPos);
@@ -48,7 +49,7 @@ void main()
     vec3 reflect_dir = reflect(-light_dir, normal);
     vec3 diffuse = max(dot(normal, light_dir), 0.0) * light_color * 0.5 / distance;
 
-    float spec = pow(max(dot(view_dir,reflect_dir),0.0), 20.0) * 2.0;
+    float spec = pow(max(dot(view_dir,reflect_dir),0.0), 20.0) * 0.8;
     vec3 specular = spec * light_color / distance;
     vec3 ambient = vec3(0.6); 
     FragColor = vec4(normal, 1.0); 

@@ -16,9 +16,13 @@ uniform mat4 lightView;
 void main()
 {
     FragPos = vec3(view * model * vec4(aPos, 1.0));
-    Normal = vec3(model * vec4(aNormal, 0.0));  
+    // FragPos.y*= -1.0;
+    Normal = vec3(model * vec4(aNormal,0.0));  
+    // Normal.y *= -1.0;
     TexCoords = aTexCoords;
     FragPosLightSpace = lightView * vec4(FragPos,1.0);
-    gl_Position = projection * view * model * vec4(aPos, 1.0);
     CubeMapCoords = mat3(model) * aPos;
+    vec4 a = model * vec4(aPos, 1.0);
+    a.y *= -1.0;
+    gl_Position = projection * view * a;
 }

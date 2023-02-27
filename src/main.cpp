@@ -29,7 +29,7 @@ bool firstMouse = true, right_first = true;
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
-    Shader *lightingShader_ptr = nullptr;
+Shader *lightingShader_ptr = nullptr, *reflect_shader_ptr = nullptr;
 
 // lighting
 glm::vec3 LightPositions[]={
@@ -148,6 +148,8 @@ int main(int argc, char **argv)
     lightingShader_ptr = new Shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/shadow.frag");
     Shader &lightingShader = *lightingShader_ptr;
     Shader depthShader("../src/shaders/depth/depth.vert","../src/shaders/depth/depth.frag");
+    reflect_shader_ptr = new Shader("../src/shaders/shadow/shadow1.vert","../src/shaders/shadow/shadow.frag");
+    Shader &reflect_shader = *reflect_shader_ptr;
     Shader cornerShader("../src/shaders/corner/corner.vert","../src/shaders/corner/corner.frag");
     Shader screenShader("../src/shaders/screen/screen.vert", "../src/shaders/screen/screen.frag");
     
@@ -321,28 +323,10 @@ int main(int argc, char **argv)
         glm::mat4 tmpmodel=glm::scale(model,glm::vec3(scale,scale,scale));
         glm::vec3 box2Pos(0.3,0.0,1.2);
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        const auto renderScene = [&](Shader &shader)
-        {
-            // renderCube();
-
-            // TODO: add rendering code here
-            // ----------------------------------------------------
-            //teapot.ComputeBoundingBox();
-            //auto c = (teapot.GetBoundMin() + teapot.GetBoundMax()) / 2.0f;
-
-            // model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f));
-            //  model = glm::mat4(1.0f);
-            model = glm::mat4(glm::mat3(0.05f));
-            shader.setMat4("view", view);
-            shader.setMat4("model", model);
-            // teapot.draw();
-            teapot.Draw(shader);
-            renderPlane();
-            // ----------------------------------------------------
-        };
 
         int viewport[4];
         glGetIntegerv(GL_VIEWPORT, viewport);
+        const auto use = [&] (Shader &lightingShader) {
         lightingShader.use();
         lightingShader.setMat4("projection", projection);
         glm::vec3 camera_init_pos(0.0f, 0.0f, 3.0f);
@@ -360,9 +344,11 @@ int main(int argc, char **argv)
         lightingShader.setVec3("lightColor",  1.0f, 1.0f, 1.0f);
         lightingShader.setVec3("lightPos",lightPos);
         
-        // world transformation
-        lightingShader.setMat4("model", model);
 
+        };
+        use(lightingShader);
+
+        
         // bind diffuse map
         glActiveTexture(GL_TEXTURE2);
         // glBindTexture(GL_TEXTURE_2D, diffuseMap);
@@ -373,7 +359,52 @@ int main(int argc, char **argv)
         glBindTexture(GL_TEXTURE_2D, specularMap);
         // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         // renderScene(lightingShader);
+        const auto renderScene = [&](Shader &shader)
+        {
+            // renderCube();
 
+            // TODO: add rendering code here
+            // ----------------------------------------------------
+            //teapot.ComputeBoundingBox();
+            //auto c = (teapot.GetBoundMin() + teapot.GetBoundMax()) / 2.0f;
+
+            // model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f));
+            //  model = glm::mat4(1.0f);
+            model = glm::mat4(glm::mat3(0.05f));
+            shader.setMat4("view", view);
+            shader.setMat4("model", model);
+            // glDisable(GL_DEPTH_TEST);
+            // teapot.draw();
+            glStencilMask(0xFF);
+            glClear(GL_STENCIL_BUFFER_BIT);
+            // glDepthMask(GL_FALSE);
+            renderPlane();
+            // glDepthMask(GL_TRUE);
+            // glEnable(GL_DEPTH_TEST);
+            // auto model2 = glm::translate(model, glm::vec3(0.0f, 10.0f, 0.0f));
+            auto model2 = model;
+            glStencilFunc(GL_ALWAYS, 1, 0XFF);
+            // model[1][1] *= -1;
+            // model = glm::translate(model, glm::vec3(0.0f, -20.0f, 0.0f));
+            use(reflect_shader);
+            reflect_shader.setMat4("view", view);
+            reflect_shader.setMat4("model", model2);
+
+            glStencilFunc(GL_EQUAL, 1, 0XFF);
+            // glDepthFunc(GL_ALWAYS);
+            glDepthFunc(GL_ALWAYS);
+
+            // glClear(GL_DEPTH_BUFFER_BIT);
+            teapot.Draw(reflect_shader);
+            glDepthFunc(GL_LEQUAL);
+            teapot.Draw(reflect_shader);
+            glStencilFunc(GL_ALWAYS, 1, 0XFF);
+            shader.use();
+                        shader.setMat4("model", model2);
+            teapot.Draw(shader);
+
+            // ----------------------------------------------------
+        };
         renderScene(lightingShader);
         {
             glStencilMask(0x00);
@@ -381,6 +412,7 @@ int main(int argc, char **argv)
             // glDepthMask(GL_FALSE);
             glm::mat4 skyview = glm::mat4(glm::mat3(view));
             glDepthFunc(GL_LEQUAL);
+
             skyboxShader.use();
             skyboxShader.setMat4("projection", projection);
             skyboxShader.setMat4("view", skyview);
@@ -477,6 +509,7 @@ void processInput(GLFWwindow *window)
         cout << "Recompiling Shader\n";
         // *lightingShader_ptr = Shader("../src/shaders/simple/simple.vert", "../src/shaders/simple/simple.frag");
         *lightingShader_ptr = Shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/shadow.frag");
+        *reflect_shader_ptr = Shader("../src/shaders/shadow/shadow1.vert", "../src/shaders/shadow/shadow.frag");
         cout << "Done\n";
 
     }
@@ -547,13 +580,13 @@ void renderPlane(){
     static unsigned int planeVBO,planeVAO=0;
     static float planeVertices[] = {
         // positions            // normals         // texcoords
-         25.0f, -0.5f,  25.0f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
-        -25.0f, -0.5f,  25.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
-        -25.0f, -0.5f, -25.0f,  0.0f, 1.0f, 0.0f,   0.0f, 25.0f,
+         25.0f, 0.0f,  25.0f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
+        -25.0f, 0.0f,  25.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
+        -25.0f, 0.0f, -25.0f,  0.0f, 1.0f, 0.0f,   0.0f, 25.0f,
 
-         25.0f, -0.5f,  25.0f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
-        -25.0f, -0.5f, -25.0f,  0.0f, 1.0f, 0.0f,   0.0f, 25.0f,
-         25.0f, -0.5f, -25.0f,  0.0f, 1.0f, 0.0f,  25.0f, 25.0f
+         25.0f, 0.0f,  25.0f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
+        -25.0f, 0.0f, -25.0f,  0.0f, 1.0f, 0.0f,   0.0f, 25.0f,
+         25.0f, 0.0f, -25.0f,  0.0f, 1.0f, 0.0f,  25.0f, 25.0f
     };
     if(planeVAO == 0){
         // plane VAO
