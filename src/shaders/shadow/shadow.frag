@@ -36,7 +36,9 @@ in vec3 CubeMapCoords;
 // }
 void main()
 {
-    vec3 normal = normalize(Normal);
+    vec3 normal = transpose(inverse(mat3(view))) * Normal;
+    // vec3 normal = Normal;
+    normal = normalize(normal);
     // vec3 view_dir = normalize(vec3(view as* vec4(view_pos, 1)) - FragPos);
     vec3 view_dir = normalize(-FragPos);
     vec3 light_dir = light_pos - FragPos;
@@ -52,9 +54,9 @@ void main()
     FragColor = vec4(normal, 1.0); 
     // FragColor = vec4(diffuse + specular + ambient, 1.0);
 
-    reflect_dir = reflect(view_dir, normal);
+    reflect_dir = reflect(-view_dir, normal);
     vec3 result = (ambient + diffuse + specular) * texture(skybox,
-    // inverse(mat3(view)) * 
+    inverse(mat3(view)) * 
     reflect_dir).rgb;
 
     // // float shadow = ShadowCalc();

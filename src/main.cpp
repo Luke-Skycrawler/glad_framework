@@ -106,7 +106,7 @@ int main(int argc, char **argv)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     // string filename(argv[1]);
-    string filename = "../src/assets/sphere.obj";
+    string filename = "../src/assets/teapot.obj";
     // cin >> filename;
 #ifdef __APPLE__
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
@@ -330,12 +330,14 @@ int main(int argc, char **argv)
             //teapot.ComputeBoundingBox();
             //auto c = (teapot.GetBoundMin() + teapot.GetBoundMax()) / 2.0f;
 
-            model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f)) * 0.05f;
-            // model = glm::mat4(1.0f);
+            // model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f));
+            //  model = glm::mat4(1.0f);
+            model = glm::mat4(glm::mat3(0.05f));
             shader.setMat4("view", view);
             shader.setMat4("model", model);
             // teapot.draw();
             teapot.Draw(shader);
+            renderPlane();
             // ----------------------------------------------------
         };
 
