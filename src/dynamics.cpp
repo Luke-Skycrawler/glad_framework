@@ -18,6 +18,7 @@ StateVector RigidBody::dSdt(const vec3 &f, int t)
     return {xdot, pdot, Ldot, Rdot};
 }
 
+static const double dhat = 1e-4;
 void RigidBody::step(int ts)
 {
     auto Sdot = dSdt(vec3(0.0, 0.0, 0.0), 0);
@@ -61,17 +62,17 @@ void RigidBody::step(int ts)
                 xi{R * r + S[1].x};
             auto K = compute_K(r, 1);
 
-            vec3 omega = R * J0.inverse() * R.transpose() * S[1].L;
-            vec3 vi = M_inv * S[1].p + skew(omega) * Rr;
+            vec3 omega = R * J0.inverse() * R.transpose() * (S[1].L + dL);
+            vec3 vi = M_inv * (S[1].p + dp) + skew(omega) * Rr;
 
             vec3 dv(0.0, 0.0, 0.0);
 
             int k = i / 2;
             dv(k) += -vi(k) * (1.0 + eps);
             if (xi(k) > 0.0)
-                dx(k) += bound - xi(k);
+                dx(k) += bound - xi(k) - dhat;
             else
-                dx(k) += -bound - xi(k);
+                dx(k) += -bound - xi(k) + dhat;
             vec3 deltap = K.inverse() * dv;
             dp += deltap;
             dL += skew(Rr) * deltap;
@@ -84,14 +85,14 @@ void RigidBody::step(int ts)
                 spdlog::info("dim = {}, vi0 = {:.6f}, vi1 = {:.6f}", k, vi(k), vi1(k));
             }
         }
-        if (tot)
-        {
-            spdlog::info("ts = {}", ts);
-        }
-
-        S[1].p += dp;
-        S[1].L += dL;
-        S[0] = S[1];
-        S[0].x += dx;
     }
+    if (tot)
+    {
+        spdlog::info("ts = {}", ts);
+    }
+
+    S[1].p += dp;
+    S[1].L += dL;
+    S[0] = S[1];
+    S[0].x += dx;
 }
