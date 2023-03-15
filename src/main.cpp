@@ -27,7 +27,7 @@ Camera camera(glm::vec3(0.0f, 0.0f, z_camera));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
-
+static const float boundf = 1.0f;
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
@@ -198,12 +198,14 @@ int main()
     glEnableVertexAttribArray(1);
     
     // load models 
-    Model body("../src/assets/cube.obj");
+    Model body("../src/assets/dragon_8kface.obj");
     auto& vs{ body.meshes[0].vertices };
     int n_vertices = vs.size();
     vec3* vertices = new vec3[n_vertices];
+    float scale = 5.0f;
     for (int i = 0; i < n_vertices; i++) {
         auto &p {vs[i].Position};
+        p /= scale;
         // vec3 p{-0.5 + (i / 4), -0.5 + (i / 2 % 2), -0.5 + i % 2};
         vertices[i] = vec3(p[0], p[1], p[2]);
     }
@@ -298,9 +300,9 @@ int main()
             model[2][2] = 0.0f;
             model[1][2] = 1.0f;
             model[2][1] = 1.0f;
-            shader.setMat4("model", glm::translate(model, glm::vec3(0.0f, 0.0f, 1.0f)));
+            shader.setMat4("model", glm::translate(model, glm::vec3(0.0f, 0.0f, boundf)));
             renderPlane();
-            shader.setMat4("model", glm::translate(model, glm::vec3(0.0f, 0.0f,-1.0f)));
+            shader.setMat4("model", glm::translate(model, glm::vec3(0.0f, 0.0f,-boundf)));
             renderPlane();
 
             model = glm::mat4(1.0f);
@@ -308,19 +310,11 @@ int main()
             model[2][2] = 0.0f;
             model[0][2] = 1.0f;
             model[2][0] = 1.0f;
-            shader.setMat4("model", glm::translate(model, glm::vec3(0.0f, 0.0f, 1.0f)));
+            shader.setMat4("model", glm::translate(model, glm::vec3(0.0f, 0.0f, boundf)));
             renderPlane();
-            shader.setMat4("model", glm::translate(model, glm::vec3(0.0f, 0.0f,-1.0f)));
+            shader.setMat4("model", glm::translate(model, glm::vec3(0.0f, 0.0f,-boundf)));
             renderPlane();
             
-            // renderCube();
-            
-            // model = glm::mat4(1.0);
-            // for (int i = 0; i < 3; i++)
-            //     model[i][i] = 2.0;
-            // shader.setMat4("model", model);
-            // // shader.setVec3("objectColor", 0.3f, 0.5f, 0.7f);
-            // renderCube();
 
             glm::mat4 A(from_eigen(globals.body->S[0].R));
             for (int i = 0; i < 3; i++)
@@ -330,7 +324,7 @@ int main()
             //model = glm::translate(model, from_eigen(globals.body ->S[0].x));
             //shader.setMat4("model", model);
             shader.setVec3("objectColor", 1.0f, 1.0f, 1.0f);
-            renderCube();
+            body.Draw(shader);
         };
         if(display_corner){
             glBindFramebuffer(GL_FRAMEBUFFER,depthMapFBO);

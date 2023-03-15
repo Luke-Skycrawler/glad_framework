@@ -9,7 +9,7 @@ using mat3 = Matrix3d;
 
 static const double dt = 1e-3,
     bound = 1.0,
-    eps = 0.0;
+    eps = 1e-1;
 inline mat3 skew(const vec3 & r){
     mat3 ret;
     ret.setZero(3,3);
