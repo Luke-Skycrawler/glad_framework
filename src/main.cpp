@@ -288,16 +288,38 @@ int main()
             // renderPlane();
 
             // translate and render another
-            model = glm::translate(model, box2Pos);
+            model = glm::translate(model, glm::vec3(0.0f, 0.0f, -1.0f));
             shader.setMat4("model", model);
+            renderPlane();
+
+            model = glm::mat4(1.0f);
+            model[1][1] = 0.0f; 
+            model[2][2] = 0.0f;
+            model[1][2] = 1.0f;
+            model[2][1] = 1.0f;
+            shader.setMat4("model", glm::translate(model, glm::vec3(0.0f, 0.0f, 1.0f)));
+            renderPlane();
+            shader.setMat4("model", glm::translate(model, glm::vec3(0.0f, 0.0f,-1.0f)));
+            renderPlane();
+
+            model = glm::mat4(1.0f);
+            model[0][0] = 0.0f; 
+            model[2][2] = 0.0f;
+            model[0][2] = 1.0f;
+            model[2][0] = 1.0f;
+            shader.setMat4("model", glm::translate(model, glm::vec3(0.0f, 0.0f, 1.0f)));
+            renderPlane();
+            shader.setMat4("model", glm::translate(model, glm::vec3(0.0f, 0.0f,-1.0f)));
+            renderPlane();
+            
             // renderCube();
-            // render body
-            model = glm::mat4(1.0);
-            for (int i = 0; i < 3; i++)
-                model[i][i] = 2.0;
-            shader.setMat4("model", model);
-            // shader.setVec3("objectColor", 0.3f, 0.5f, 0.7f);
-            renderCube();
+            
+            // model = glm::mat4(1.0);
+            // for (int i = 0; i < 3; i++)
+            //     model[i][i] = 2.0;
+            // shader.setMat4("model", model);
+            // // shader.setVec3("objectColor", 0.3f, 0.5f, 0.7f);
+            // renderCube();
 
             glm::mat4 A(from_eigen(globals.body->S[0].R));
             for (int i = 0; i < 3; i++)
@@ -455,12 +477,12 @@ void renderPlane(){
     static unsigned int planeVBO,planeVAO=0;
     static float planeVertices[] = {
         // positions            // normals         // texcoords
-         25.0f,  25.0f,-0.5f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
-        -25.0f,  25.0f,-0.5f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
-        -25.0f, -25.0f,-0.5f,  0.0f, 1.0f, 0.0f,   0.0f, 25.0f,
-         25.0f,  25.0f,-0.5f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
-        -25.0f, -25.0f,-0.5f,  0.0f, 1.0f, 0.0f,   0.0f, 25.0f,
-         25.0f, -25.0f,-0.5f,  0.0f, 1.0f, 0.0f,  25.0f, 25.0f
+         25.0f,  25.0f, 0.0f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
+        -25.0f,  25.0f, 0.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
+        -25.0f, -25.0f, 0.0f,  0.0f, 1.0f, 0.0f,   0.0f, 25.0f,
+         25.0f,  25.0f, 0.0f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
+        -25.0f, -25.0f, 0.0f,  0.0f, 1.0f, 0.0f,   0.0f, 25.0f,
+         25.0f, -25.0f, 0.0f,  0.0f, 1.0f, 0.0f,  25.0f, 25.0f
     };
     if(planeVAO == 0){
         // plane VAO
