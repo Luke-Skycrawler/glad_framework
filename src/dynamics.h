@@ -9,7 +9,7 @@ using mat3 = Matrix3d;
 
 static const double dt = 1e-3,
     bound = 1.0,
-    eps = 1e-2;
+    eps = 0.0;
 inline mat3 skew(const vec3 & r){
     mat3 ret;
     ret.setZero(3,3);
@@ -39,7 +39,7 @@ struct RigidBody{
     double M_inv;
     mat3 J0;
     int n_vertices; 
-    vector<int> col_set;
+    vector<int> col_set[6];
     vec3 *vertices;
     
     RigidBody(int n_vertices = 0, vec3 * vertices = nullptr): n_vertices(n_vertices), vertices(vertices), M_inv(1.0){

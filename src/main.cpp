@@ -200,10 +200,11 @@ int main()
     // load models 
     Model body("../src/assets/cube.obj");
     auto& vs{ body.meshes[0].vertices };
-    int n_vertices = 8;
+    int n_vertices = vs.size();
     vec3* vertices = new vec3[n_vertices];
     for (int i = 0; i < n_vertices; i++) {
-        vec3 p{-0.5 + (i / 4), -0.5 + (i / 2 % 2), -0.5 + i % 2};
+        auto &p {vs[i].Position};
+        // vec3 p{-0.5 + (i / 4), -0.5 + (i / 2 % 2), -0.5 + i % 2};
         vertices[i] = vec3(p[0], p[1], p[2]);
     }
     globals.body = new RigidBody(n_vertices, vertices);
