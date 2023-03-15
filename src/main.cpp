@@ -198,7 +198,7 @@ int main()
     glEnableVertexAttribArray(1);
     
     // load models 
-    Model body("../src/assets/cube.obj");
+    Model body("../src/assets/dragon_8kface.obj");
     auto& vs{ body.meshes[0].vertices };
     int n_vertices = vs.size();
     vec3* vertices = new vec3[n_vertices];
@@ -330,7 +330,8 @@ int main()
             //model = glm::translate(model, from_eigen(globals.body ->S[0].x));
             //shader.setMat4("model", model);
             shader.setVec3("objectColor", 1.0f, 1.0f, 1.0f);
-            renderCube();
+            body.Draw(shader);
+            // renderCube();
         };
         if(display_corner){
             glBindFramebuffer(GL_FRAMEBUFFER,depthMapFBO);
@@ -381,7 +382,7 @@ int main()
         }
         renderScene(lightingShader);
         // also draw the lamp object
-        lights.Draw(camera);
+        // lights.Draw(camera);
 
         if(display_corner){
             glBindFramebuffer(GL_FRAMEBUFFER,0);
