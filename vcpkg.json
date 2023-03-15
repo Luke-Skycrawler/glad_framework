@@ -5,6 +5,8 @@
     "glad",
     "assimp",
     "glfw3",
-    "glm"
+    "glm",
+    "eigen3",
+    "spdlog"
   ]
 }

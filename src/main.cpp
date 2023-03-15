@@ -4,7 +4,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <vector>
-
+#include <spdlog/spdlog.h>
 #include "shader.h"
 #include "camera.h"
 #include "mesh.h"
@@ -22,7 +22,7 @@ bool model_draw = true, display_corner = true, move_light = false;
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 // camera
-static const float z_camera = 3.0f;
+static const float z_camera = 2.0f;
 Camera camera(glm::vec3(0.0f, 0.0f, z_camera));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
@@ -42,13 +42,52 @@ glm::vec3 LightPositions[]={
     glm::vec3(2.0f, -2.0f, 5.0f)   
 };
 glm::vec3 &lightPos(LightPositions[0]);
+
+glm::mat4 from_eigen(Eigen::Matrix3d &eig_matrix){
+    glm::mat3 a = glm::make_mat3(eig_matrix.data());
+    glm::mat4 ret(a);
+    return ret;
+}
+
+glm::vec3 from_eigen(Eigen::Vector3d &eig_vec) {
+    glm::vec3 v = glm::make_vec3(eig_vec.data());
+    return v;
+}
+
+void processInput(GLFWwindow* window)
+{
+    if (move_light) {
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+            lightPos += 2.5f * deltaTime * camera.Front;
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+            lightPos -= 2.5f * deltaTime * camera.Front;
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+            lightPos -= 2.5f * deltaTime * camera.Right;
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+            lightPos += 2.5f * deltaTime * camera.Right;
+    }
+    else {
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+            camera.ProcessKeyboard(FORWARD, deltaTime);
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+            camera.ProcessKeyboard(BACKWARD, deltaTime);
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+            camera.ProcessKeyboard(LEFT, deltaTime);
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+            camera.ProcessKeyboard(RIGHT, deltaTime);
+    }
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, true);
+
+    // if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
+    // {
+    //     auto proj_t = -(camera.Front / camera.Front[2]) * z_camera;
+    //     globals.body.force(proj_t[0], proj_t[1]);
+    // }
+    // else globals.body.f = glm::vec2(0.0);
+}
 int main()
 {
-
-    if (concentric) {
-        globals.p.pos = glm::vec2(0.0, 0.1f);
-        globals.p.v = glm::vec2(0.0, 0.0);
-    }
     // glfw: initialize and configure
     // ------------------------------------------------------------------
     glfwInit();
@@ -93,11 +132,11 @@ int main()
 
     // build and compile our shader programs
     // ------------------------------------------------------------------
-    //Shader lightingShader("shaders/cursor/cursor.vert", "shaders/cursor/cursor.frag", "shaders/cursor/cursor.geom");
-    Shader lightingShader("shaders/shadow/shadow.vert", "shaders/shadow/shadow.frag");
-    //Shader lightingShader("shaders/light/multi_light.vert", "shaders/light/multi_light.frag");
-    Shader depthShader("shaders/depth/depth.vert","shaders/depth/depth.frag");
-    Shader cornerShader("shaders/corner/corner.vert","shaders/corner/corner.frag");
+    //Shader lightingShader("../src/shaders/cursor/cursor.vert", "../src/shaders/cursor/cursor.frag", "../src/shaders/cursor/cursor.geom");
+    Shader lightingShader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/shadow.frag");
+    //Shader lightingShader("../src/shaders/light/multi_light.vert", "../src/shaders/light/multi_light.frag");
+    Shader depthShader("../src/shaders/depth/depth.vert","../src/shaders/depth/depth.frag");
+    Shader cornerShader("../src/shaders/corner/corner.vert","../src/shaders/corner/corner.frag");
     // select buffers setup
     // ------------------------------------------------------------------
     unsigned int tex, buf;
@@ -159,12 +198,21 @@ int main()
     glEnableVertexAttribArray(1);
     
     // load models 
-    Model particle("assets/sphere.obj");
+    Model body("../src/assets/cube.obj");
+    auto& vs{ body.meshes[0].vertices };
+    int n_vertices = 8;
+    vec3* vertices = new vec3[n_vertices];
+    for (int i = 0; i < n_vertices; i++) {
+        vec3 p{-0.5 + (i / 4), -0.5 + (i / 2 % 2), -0.5 + i % 2};
+        vertices[i] = vec3(p[0], p[1], p[2]);
+    }
+    globals.body = new RigidBody(n_vertices, vertices);
+
     Light lights(LightPositions,4);
     // load textures (we now use a utility function to keep the code more organized)
     // ------------------------------------------------------------------
-    unsigned int diffuseMap = loadTexture("assets/wood.png");
-    unsigned int specularMap = loadTexture("assets/wood_specular.png");
+    unsigned int diffuseMap = loadTexture("../src/assets/wood.png");
+    unsigned int specularMap = loadTexture("../src/assets/wood_specular.png");
 
     cornerShader.setInt("screenTexture",0);
     
@@ -200,6 +248,7 @@ int main()
     // ------------------------------------------------------------------
     // render loop
     // ------------------------------------------------------------------
+    int ts = 0;
     while (!glfwWindowShouldClose(window))
     {
         // per-frame time logic
@@ -208,10 +257,7 @@ int main()
         // lightingShader.setFloat("time",currentFrame);
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
-        if (implicit)
-        globals.p.step_implicit(deltaTime);
-        else 
-        globals.p.step(deltaTime, concentric);
+        globals.body->step(ts++);
         // input
         processInput(window);
         // render setup
@@ -236,59 +282,32 @@ int main()
         glm::mat4 tmpmodel=glm::scale(model,glm::vec3(scale,scale,scale));
         glm::vec3 box2Pos(0.3,0.0,1.2);
         glm::mat4 lightSpaceTrans = glm::lookAt(lightPos,glm::vec3(0.0f),camera.WorldUp);
-        
+
         const auto renderScene = [&](Shader &shader)
         {
-            renderPlane();
+            // renderPlane();
 
             // translate and render another
             model = glm::translate(model, box2Pos);
             shader.setMat4("model", model);
             // renderCube();
-            // render particle
-            // shader.setMat4("model");
-            auto &p = globals.p.f;
-            const auto norm = [](float x, float y) -> float {
-                return sqrt(x * x + y * y);
-            };
-            float u = norm(p[0], p[1]);
-            const float bound = 5.0f, radius = 2.04558420181;
-            model = glm::mat4((bound  + radius * 0.1f) * 2), glm::vec3(globals.p.pos * 10.0f, 0.0f);
+            // render body
+            model = glm::mat4(1.0);
+            for (int i = 0; i < 3; i++)
+                model[i][i] = 2.0;
             shader.setMat4("model", model);
-            shader.setVec3("objectColor", 0.3f, 0.5f, 0.7f);
+            // shader.setVec3("objectColor", 0.3f, 0.5f, 0.7f);
             renderCube();
 
-            model = glm::translate(glm::mat4(0.1f), glm::vec3(globals.p.pos * 10.0f, 0.0f));
-            shader.setMat4("model", model);
-
-
+            glm::mat4 A(from_eigen(globals.body->S[0].R));
+            for (int i = 0; i < 3; i++)
+                A[3][i] = globals.body->S[0].x(i);
+            A[3][3] = 1.0;
+            shader.setMat4("model", A);
+            //model = glm::translate(model, from_eigen(globals.body ->S[0].x));
+            //shader.setMat4("model", model);
             shader.setVec3("objectColor", 1.0f, 1.0f, 1.0f);
-            particle.Draw(shader);
-            
-
-            model = glm::translate(glm::mat4(0.1f), glm::vec3(globals.p.pos * 10.0f, 0.5f));
-            if (u != 0.0f) {
-            model[1][1] = globals.p.f[1] / u;
-            model[1][0] = globals.p.f[0] / u;
-            model[0][1] = globals.p.f[0] / u;
-            model[0][0] = -globals.p.f[1] / u;
-
-            }
-            u /= 5.0;
-            u = fmax(fmin(1.0, u), 0.0);
-
-            shader.setMat4("model", model);
-            shader.setVec3("objectColor", u, 0.5f, 1.0f - u);
-            render_arrow(u * 2.0);
-            
-            // TODO: add rendering code here
-            // ----------------------------------------------------
-
-
-
-
-
-            // ----------------------------------------------------
+            renderCube();
         };
         if(display_corner){
             glBindFramebuffer(GL_FRAMEBUFFER,depthMapFBO);
@@ -385,37 +404,7 @@ void gen_preview_framebuffer(){
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
-void processInput(GLFWwindow *window)
-{
-    if(move_light){
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-            lightPos+= 2.5f*deltaTime*camera.Front;
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-            lightPos-= 2.5f*deltaTime*camera.Front;
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-            lightPos-= 2.5f*deltaTime*camera.Right;
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-            lightPos+= 2.5f*deltaTime*camera.Right;
-    }
-     else{
-         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-             camera.ProcessKeyboard(FORWARD, deltaTime);
-         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-             camera.ProcessKeyboard(BACKWARD, deltaTime);
-         if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-             camera.ProcessKeyboard(LEFT, deltaTime);
-         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-             camera.ProcessKeyboard(RIGHT, deltaTime);
-     }
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, true);
-    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
-    {
-        auto proj_t = -(camera.Front / camera.Front[2]) * z_camera;
-        globals.p.force(proj_t[0], proj_t[1]);
-    }
-    else globals.p.f = glm::vec2(0.0);
-}
+
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
 // ---------------------------------------------------------------------------------------------
@@ -653,9 +642,9 @@ void render_arrow(float len){
     glDrawArrays(GL_TRIANGLES, 0, 36);
 }
 void click_callback(GLFWwindow* window,int button,int action,int mods){
-if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
-{
-    auto proj_t = camera.Front / camera.Front[2] * -(z_camera + 0.5f);
-    globals.p.force(proj_t[0], proj_t[1]);
-}
+//if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+//{
+//    auto proj_t = camera.Front / camera.Front[2] * -(z_camera + 0.5f);
+//    globals.body.force(proj_t[0], proj_t[1]);
+//}
 }

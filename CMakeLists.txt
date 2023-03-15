@@ -7,7 +7,8 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
-
+find_package (Eigen3 3.3 NO_MODULE)
+find_package(spdlog REQUIRED)
 set(PROJECT_NAME main)
 
 ################################################################################
@@ -52,7 +53,7 @@ target_include_directories(main PRIVATE
     ${GLAD_INCLUDE_DIRS})
 
 target_sources(main PRIVATE ${ALL_FILES})
-target_link_libraries(main PRIVATE glfw assimp::assimp glad::glad glm::glm)
+target_link_libraries(main PRIVATE glfw assimp::assimp glad::glad glm::glm Eigen3::Eigen spdlog::spdlog_header_only)
 # set_property(TARGET main PROPERTY CXX_STANDARD 20)
 
 # # tests target

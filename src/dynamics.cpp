@@ -1,70 +1,87 @@
 #include "dynamics.h"
-#include <iostream>
-using namespace std;
-using namespace glm;
-static const float k = 3, m = 1, alpha_damp = 1.0f, bound = 5;
-void Particle::force(float xc, float yc)
-{
-    vec2 pc{xc, yc};
-    f = k * (pc - pos);
-    //cout << pc[0] << " " << pc[1] << "\n";
+#include <spdlog/spdlog.h>
+mat3 RigidBody::compute_K(const vec3 &r, int t){
+    auto & R {S[t].R};
+    mat3 Rr {skew(R * r)};
+    mat3 J_inv {R * J0.inverse() * R.transpose()};
+    return M_inv * mat3::Identity(3, 3) - Rr * J_inv * Rr;
 }
 
-mat3 skew(vec3 r)
-{
-    glm::mat3 ret(0.0);
-    ret[1][0] = -r[2];
-    ret[0][1] = +r[2];
-    ret[2][0] = +r[1];
-    ret[0][2] = -r[1];
-    ret[2][1] = -r[0];
-    ret[1][2] = +r[0];
-    return ret;
-}
-void Particle::step_implicit(float dt)
-{
-    mat3 m = mat3(1.0) - (skew(vec3(0.0, 0.0, 1.0)) * dt * dt);
-
-    vec3 b(pos + dt * v, 0.0f);
-    auto J = determinant(m);
-    vec3 a1(m[0]), a2(m[1]), a3(m[2]);
-    auto x1 = determinant(mat3(b, a2, a3)) / J;
-    auto x2 = determinant(mat3(a1, b, a3)) / J;
-    auto x3 = determinant(mat3(a1, a2, b)) / J;
-    auto opos = pos;
-    pos = vec2(x1, x2);
-    v = -(opos - pos) / dt;
-    bounce();
-    cout << dot(pos, pos) << " " << dt << "\n";
-}
-void Particle::concentric_explicit()
-{
-    auto tang = cross(vec3(pos, 0.0), vec3(0.0, 0.0, 1.0));
-    f = tang * k;
-}
-void Particle::step(float dt, bool centre)
-{
-    if (centre)
-        concentric_explicit();
-    v += f * dt / m;
-    v *= alpha_damp;
-    pos += v * dt;
-    bounce();
+StateVector RigidBody::dSdt(const vec3 &f, int t){
+    auto & R{S[t].R};
+    auto &pdot = f;
+    auto & xdot = M_inv * S[t].p;
+    auto & Rdot = skew(R * J0.inverse() * R.transpose() * S[t].L) * R;
+    vec3 Ldot(0.0, 0.0, 0.0);
+    return {xdot, pdot, Ldot, Rdot};
 }
 
-void Particle::bounce(){
-    float& x = pos[0], &y = pos[1];
-    const auto reflect = [](float &x, float &v){
-        if (x < -bound) {
-            x = -2 * bound - x;
-            v = -v;
+void RigidBody::step(int ts) {
+    auto Sdot = dSdt(vec3(0.0, 0.0, 0.0), 0);
+    
+    S[1] = S[0] + Sdot * dt;
+    col_set.resize(0);
+    auto R = S[1].R;
+
+    for (int i = 0; i < n_vertices;i++) {
+        vec3 &r {vertices[i]}, xi {R * r + S[1].x};
+        if ((xi.array().abs() > bound).any()) {
+            col_set.push_back(i);
         }
-        if (x > bound) {
-            x = 2 * bound - x;
-            v = -v;
+    }
+    if (col_set.size()) spdlog::info("collsiion set size = {}", col_set.size());
+
+    vec3 dp(0.0, 0.0, 0.0), dL(0.0, 0.0, 0.0), dx(0.0, 0.0, 0.0);
+    vec3 r(0.0, 0.0, 0.0);
+    
+    for (int I:col_set) {
+    //     vec3 &rr {vertices[I]};
+    //     r +=rr;
+    // }
+    // if (col_set.size()) {
+    //     r /= col_set.size();
+    //     {
+        vec3 r{vertices[I]};
+            vec3 Rr{ R * r },
+                xi{ R * r + S[1].x };
+            auto K = compute_K(r, 1);
+
+            vec3 omega = R * J0.inverse() * R.transpose() * S[1].L;
+            vec3 vi = M_inv * S[1].p + skew(omega) * Rr;
+
+            vec3 dv(0.0, 0.0, 0.0);
+
+            for (int k = 0; k < 3; k++) {
+                if (abs(xi(k)) > bound) {
+                    dv(k) += -vi(k) * (1.0 + eps);
+                    if (xi(k) > 0.0) dx(k) += bound - xi(k);
+                    else dx(k) += -bound - xi(k);
+                }
+            }
+            vec3 deltap = K.inverse() * dv;
+            dp += deltap;
+            dL += skew(Rr) * deltap;
+
+            vec3 omega1 = R * J0.inverse() * R.transpose() * (S[1].L + dL);
+            vec3 vi1 = M_inv * (S[1].p + dp) + skew(omega1) * Rr;
+
+            for (int k = 0; k < 3; k++) if (dv(k) != 0.0) {
+                spdlog::info("dim = {}, vi0 = {:.6f}, vi1 = {:.6f}", k, vi(k), vi1(k));
+            }
+
         }
-        assert(x < bound && x > -bound);
-    };
-    reflect(x, v[0]);
-    reflect(y, v[1]);
+    //}
+    if (col_set.size()) {
+        spdlog::info("ts = {}", ts);
+        col_set.resize(0);
+    }
+
+
+    S[1].p += dp;
+    S[1].L += dL;
+    S[0] = S[1];
+    S[0].x += dx;
 }
+
+
+

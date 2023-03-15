@@ -28,8 +28,8 @@ float ShadowCalc(){
 }
 void main()
 {
-    float ambientStrength =0.1;
-    float specularStrength = 0.5;
+    float ambientStrength =0.5;
+    float specularStrength = 0.8;
 
     vec3 ambient= ambientStrength * lightColor;
     
@@ -45,6 +45,9 @@ void main()
     // vec3 result = (ambient + diffuse) * texture(material.diffuse,TexCoords).rgb+specular*texture(material.specular,TexCoords).rgb;
 
     float shadow = ShadowCalc();
-    vec3 result = (ambient +(shadow)* diffuse) * texture(material.diffuse,TexCoords).rgb+(shadow)*specular*texture(material.specular,TexCoords).rgb;
+    vec3 result = (ambient +(shadow)* diffuse) * 
+    // texture(material.diffuse,TexCoords).rgb
+    objectColor
+    +(shadow)* specular*texture(material.specular,TexCoords).rgb;
     FragColor = vec4(result, 1.0);
 }
