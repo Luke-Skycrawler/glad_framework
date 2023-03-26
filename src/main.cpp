@@ -14,6 +14,7 @@
 #include "cyTriMesh.h"
 #include <iostream>
 #define _TO_FRAMEBUFFER_
+#define _PATCH_
 unsigned int depthMapFBO,depthMap;
 static const int SHADOW_WIDTH=800,SHADOW_HEIGHT=600;
 bool model_draw = true, move_light = false;
@@ -163,7 +164,7 @@ int main(int argc, char **argv)
     // out_of_plane_shader_ptr = new Shader("../src/shaders/shadow/show_lines.vert", "../src/shaders/shadow/opd.frag", "../src/shaders/shadow/disp.tese");
 
     Shader &out_of_plane_shader = *out_of_plane_shader_ptr;
-    Shader line_segs_shader("../src/shaders/shadow/show_lines.vert", "../src/shaders/shadow/show_lines.frag", "../src/shaders/shadow/show_lines.geom");
+    Shader line_segs_shader("../src/shaders/shadow/show_lines.vert", "../src/shaders/shadow/show_lines.frag", "../src/shaders/shadow/show_lines.geom", "../src/shaders/shadow/disp.tesc", "../src/shaders/shadow/disp.tese");
 
     // select buffers setup
     // ------------------------------------------------------------------
@@ -472,12 +473,14 @@ int main(int argc, char **argv)
                 shader.setMat4("view", camera.GetViewMatrix());
                 shader.setVec3("light_color", 1.0f, 1.0f, 1.0f);
                 shader.setVec3("light_pos", lightPos);
+                shader.setFloat("lod", 10);
             };
             out_of_plane_setup(out_of_plane_shader);
             glBindVertexArray(quadVAO);
             glActiveTexture(GL_TEXTURE0);
             // glBindTexture(GL_TEXTURE_2D, texColorBuffer);
             glBindTexture(GL_TEXTURE_2D, normal_map);
+            
             #ifdef _PATCH_
             glPatchParameteri(GL_PATCH_VERTICES, 4);
             glDrawArrays(GL_PATCHES, 0, 4);
@@ -488,6 +491,8 @@ int main(int argc, char **argv)
             {
                 out_of_plane_setup(line_segs_shader);
                 #ifdef _PATCH_
+                glPatchParameteri(GL_PATCH_VERTICES, 4);
+
                 glDrawArrays(GL_PATCHES, 0, 4);
                 #else
 
@@ -565,7 +570,7 @@ void processInput(GLFWwindow *window)
     if (glfwGetKey(window, GLFW_KEY_F6) == GLFW_PRESS) {
         cout << "Recompiling Shader\n";
         // *out_of_plane_shader_ptr = Shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/opn.frag");
-        *out_of_plane_shader_ptr = Shader("../src/shaders/shadow/show_lines.vert", "../src/shaders/shadow/opd.frag", nullptr, nullptr, "../src/shaders/shadow/disp.tese");
+        *out_of_plane_shader_ptr = Shader("../src/shaders/shadow/show_lines.vert", "../src/shaders/shadow/opd.frag", nullptr, "../src/shaders/shadow/disp.tesc", "../src/shaders/shadow/disp.tese");
         *lightingShader_ptr = Shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/shadow.frag");
         *reflect_shader_ptr = Shader("../src/shaders/shadow/shadow1.vert", "../src/shaders/shadow/shadow.frag");
         cout << "Done\n";
