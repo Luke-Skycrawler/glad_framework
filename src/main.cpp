@@ -160,6 +160,8 @@ int main(int argc, char **argv)
     Shader screenShader("../src/shaders/screen/screen.vert", "../src/shaders/screen/screen.frag");
     // Shader out_of_plane_shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/op.frag");
     out_of_plane_shader_ptr = new Shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/opn.frag");
+    // out_of_plane_shader_ptr = new Shader("../src/shaders/shadow/show_lines.vert", "../src/shaders/shadow/opd.frag", "../src/shaders/shadow/disp.tese");
+
     Shader &out_of_plane_shader = *out_of_plane_shader_ptr;
     Shader line_segs_shader("../src/shaders/shadow/show_lines.vert", "../src/shaders/shadow/show_lines.frag", "../src/shaders/shadow/show_lines.geom");
 
@@ -196,8 +198,10 @@ int main(int argc, char **argv)
         -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
         -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
         1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,
+        #ifndef _PATCH_
         -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
         1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,
+        #endif
         1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f};
     glGenVertexArrays(1, &quadVAO);
     glGenBuffers(1, &quadVBO);
@@ -474,9 +478,22 @@ int main(int argc, char **argv)
             glActiveTexture(GL_TEXTURE0);
             // glBindTexture(GL_TEXTURE_2D, texColorBuffer);
             glBindTexture(GL_TEXTURE_2D, normal_map);
+            #ifdef _PATCH_
+            glPatchParameteri(GL_PATCH_VERTICES, 4);
+            glDrawArrays(GL_PATCHES, 0, 4);
+            #else 
             glDrawArrays(GL_TRIANGLES, 0, 6);
-            out_of_plane_setup(line_segs_shader);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
+            #endif
+            if (show_line_segs)
+            {
+                out_of_plane_setup(line_segs_shader);
+                #ifdef _PATCH_
+                glDrawArrays(GL_PATCHES, 0, 4);
+                #else
+
+                glDrawArrays(GL_TRIANGLES, 0, 6);
+                #endif
+            }
 
             render_sky();
         }
@@ -547,7 +564,8 @@ void processInput(GLFWwindow *window)
         glfwSetWindowShouldClose(window, true);
     if (glfwGetKey(window, GLFW_KEY_F6) == GLFW_PRESS) {
         cout << "Recompiling Shader\n";
-        *out_of_plane_shader_ptr = Shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/opn.frag");
+        // *out_of_plane_shader_ptr = Shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/opn.frag");
+        *out_of_plane_shader_ptr = Shader("../src/shaders/shadow/show_lines.vert", "../src/shaders/shadow/opd.frag", nullptr, nullptr, "../src/shaders/shadow/disp.tese");
         *lightingShader_ptr = Shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/shadow.frag");
         *reflect_shader_ptr = Shader("../src/shaders/shadow/shadow1.vert", "../src/shaders/shadow/shadow.frag");
         cout << "Done\n";

@@ -20,7 +20,7 @@ public:
     unsigned int xfb,vbo[2];
     // constructor generates the shader on the fly
     // ------------------------------------------------------------------------
-    Shader(const char* vertexPath, const char* fragmentPath, const char* geometryPath = nullptr,const char * varyings[]=nullptr)
+    Shader(const char *vertexPath, const char *fragmentPath, const char *geometryPath = nullptr, const char *tescPath = nullptr, const char *tesePath = nullptr, const char *varyings[] = nullptr)
     {
         // 1. retrieve the vertex/fragment source code from filePath
         std::string vertexCode;
@@ -33,6 +33,26 @@ public:
         vShaderFile.exceptions (std::ifstream::failbit | std::ifstream::badbit);
         fShaderFile.exceptions (std::ifstream::failbit | std::ifstream::badbit);
         gShaderFile.exceptions (std::ifstream::failbit | std::ifstream::badbit);
+        unsigned int vertex, fragment, geometry, tese, tesc;
+
+        const auto build_shader_from_path = [&](const char *path, int gl_shader_type) -> unsigned int
+        {
+            if (path != nullptr)
+            {
+                std::ifstream ShaderFile;
+                std::stringstream ShaderStream;
+                ShaderFile.open(path);
+                ShaderStream << ShaderFile.rdbuf();
+                ShaderFile.close();
+                auto Code = ShaderStream.str();
+                const char *ShaderCode = Code.c_str();
+                auto glshader = glCreateShader(gl_shader_type);
+                glShaderSource(glshader, 1, &ShaderCode, NULL);
+                glCompileShader(glshader);
+                checkCompileErrors(glshader, "TESSELLATION");
+                return glshader;
+            }
+        };
         try 
         {
             // open files
@@ -59,15 +79,18 @@ public:
                 gShaderFile.close();
                 geometryCode = gShaderStream.str();
             }
+            tese = build_shader_from_path(tesePath, GL_TESS_EVALUATION_SHADER);
+            tesc = build_shader_from_path(tescPath, GL_TESS_CONTROL_SHADER);
         }
         catch (std::ifstream::failure& e)
         {
             std::cout << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ" << std::endl;
         }
+
         const char* vShaderCode = vertexCode.c_str();
         const char * fShaderCode = fragmentCode.c_str();
+
         // 2. compile shaders
-        unsigned int vertex, fragment;
         // vertex shader
         vertex = glCreateShader(GL_VERTEX_SHADER);
         glShaderSource(vertex, 1, &vShaderCode, NULL);
@@ -79,38 +102,56 @@ public:
         glCompileShader(fragment);
         checkCompileErrors(fragment, "FRAGMENT");
         // if geometry shader is given, compile geometry shader
-        unsigned int geometry;
-        if(geometryPath != nullptr)
+        if (geometryPath != nullptr)
         {
-            const char * gShaderCode = geometryCode.c_str();
+            const char *gShaderCode = geometryCode.c_str();
             geometry = glCreateShader(GL_GEOMETRY_SHADER);
             glShaderSource(geometry, 1, &gShaderCode, NULL);
             glCompileShader(geometry);
             checkCompileErrors(geometry, "GEOMETRY");
         }
+
         // shader Program
         ID = glCreateProgram();
-        glAttachShader(ID, vertex);
-        glAttachShader(ID, fragment);
-        if(geometryPath != nullptr){
 
-            glAttachShader(ID, geometry);
-            if(varyings!=nullptr)glTransformFeedbackVaryings(ID, sizeof(varyings)/sizeof(char*), varyings, GL_INTERLEAVED_ATTRIBS);
+        {
+            glAttachShader(ID, vertex);
+            glAttachShader(ID, fragment);
+            if (tescPath != nullptr)
+                glAttachShader(ID, tesc);
+            if (tesePath != nullptr)
+                glAttachShader(ID, tese);
+            if (geometryPath != nullptr)
+            {
+                glAttachShader(ID, geometry);
+                if (varyings != nullptr)
+                    glTransformFeedbackVaryings(ID, sizeof(varyings) / sizeof(char *), varyings, GL_INTERLEAVED_ATTRIBS);
+            }
         }
+
         glLinkProgram(ID);
         checkCompileErrors(ID, "PROGRAM");
-        // delete the shaders as they're linked into our program now and no longer necessery
-        glDeleteShader(vertex);
-        glDeleteShader(fragment);
-        if(geometryPath != nullptr){
-            glDeleteShader(geometry);
-            glUseProgram(ID);
-            // glGenVertexArrays(2, vao);
-            glGenBuffers(2, vbo);
-            for (int i = 0; i < 2; i++){
-                glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, vbo[i]);
-                glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 50 * sizeof(int), NULL, GL_DYNAMIC_READ);
-                glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, i, vbo[i]);
+
+        {
+            // delete the shaders as they're linked into our program now and no longer necessery
+            glDeleteShader(vertex);
+            glDeleteShader(fragment);
+            if (tescPath != nullptr)
+                glDeleteShader(tesc);
+            if (tesePath != nullptr)
+                glDeleteShader(tese);
+            if (geometryPath != nullptr)
+            {
+                glDeleteShader(geometry);
+                glUseProgram(ID);
+                // glGenVertexArrays(2, vao);
+                glGenBuffers(2, vbo);
+                for (int i = 0; i < 2; i++)
+                {
+                    glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, vbo[i]);
+                    glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 50 * sizeof(int), NULL, GL_DYNAMIC_READ);
+                    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, i, vbo[i]);
+                }
             }
         }
     }
