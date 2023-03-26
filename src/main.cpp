@@ -27,7 +27,7 @@ Camera camera_in_plane(glm::vec3(0.0f, 0.0f, 3.0f));
 bool control_in_plane = true;
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
-bool firstMouse = true, right_first = true;
+bool firstMouse = true, right_first = true, show_line_segs = true;
 
 // timing
 float deltaTime = 0.0f;
@@ -48,6 +48,17 @@ glm::vec3 &lightPos(LightPositions[0]);
 using namespace cy;
 using namespace std;
 using namespace glm;
+
+void char_callback(GLFWwindow *window, unsigned int codepoint)
+{
+    if (codepoint == ' ')
+    {
+
+        cout << "space \n";
+        show_line_segs = !show_line_segs;
+    }
+}
+
 struct shayMesh : public TriMesh
 {
     shayMesh(const string &filename)
@@ -121,6 +132,7 @@ int main(int argc, char **argv)
     }
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetCharCallback(window, char_callback);
 
     // tell GLFW to capture our mouse
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -141,15 +153,15 @@ int main(int argc, char **argv)
     // ------------------------------------------------------------------
     lightingShader_ptr = new Shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/shadow.frag");
     Shader &lightingShader = *lightingShader_ptr;
-    Shader depthShader("../src/shaders/depth/depth.vert","../src/shaders/depth/depth.frag");
-    reflect_shader_ptr = new Shader("../src/shaders/shadow/shadow1.vert","../src/shaders/shadow/shadow.frag");
+    Shader depthShader("../src/shaders/depth/depth.vert", "../src/shaders/depth/depth.frag");
+    reflect_shader_ptr = new Shader("../src/shaders/shadow/shadow1.vert", "../src/shaders/shadow/shadow.frag");
     Shader &reflect_shader = *reflect_shader_ptr;
-    Shader cornerShader("../src/shaders/corner/corner.vert","../src/shaders/corner/corner.frag");
+    Shader cornerShader("../src/shaders/corner/corner.vert", "../src/shaders/corner/corner.frag");
     Shader screenShader("../src/shaders/screen/screen.vert", "../src/shaders/screen/screen.frag");
     // Shader out_of_plane_shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/op.frag");
     out_of_plane_shader_ptr = new Shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/opn.frag");
-    Shader &out_of_plane_shader = * out_of_plane_shader_ptr;
-    
+    Shader &out_of_plane_shader = *out_of_plane_shader_ptr;
+    Shader line_segs_shader("../src/shaders/shadow/show_lines.vert", "../src/shaders/shadow/show_lines.frag", "../src/shaders/shadow/show_lines.geom");
 
     // select buffers setup
     // ------------------------------------------------------------------
@@ -448,18 +460,24 @@ int main(int argc, char **argv)
             glStencilMask(0XFF);
             glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-            out_of_plane_shader.use();
-            out_of_plane_shader.setMat4("model", glm::mat4(1.0f));
-            out_of_plane_shader.setMat4("projection", projection);
-            out_of_plane_shader.setMat4("view", camera.GetViewMatrix());
-            out_of_plane_shader.setVec3("light_color", 1.0f, 1.0f, 1.0f);
-            out_of_plane_shader.setVec3("light_pos", lightPos);
-
+            const auto out_of_plane_setup = [&](Shader &shader)
+            {
+                shader.use();
+                shader.setMat4("model", glm::mat4(1.0f));
+                shader.setMat4("projection", projection);
+                shader.setMat4("view", camera.GetViewMatrix());
+                shader.setVec3("light_color", 1.0f, 1.0f, 1.0f);
+                shader.setVec3("light_pos", lightPos);
+            };
+            out_of_plane_setup(out_of_plane_shader);
             glBindVertexArray(quadVAO);
             glActiveTexture(GL_TEXTURE0);
             // glBindTexture(GL_TEXTURE_2D, texColorBuffer);
             glBindTexture(GL_TEXTURE_2D, normal_map);
             glDrawArrays(GL_TRIANGLES, 0, 6);
+            out_of_plane_setup(line_segs_shader);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+
             render_sky();
         }
 #endif
