@@ -13,7 +13,7 @@
 #include "light.h"
 #include "cyTriMesh.h"
 #include <iostream>
-
+#define _TO_FRAMEBUFFER_
 unsigned int depthMapFBO,depthMap;
 static const int SHADOW_WIDTH=800,SHADOW_HEIGHT=600;
 bool model_draw = true, move_light = false;
@@ -22,6 +22,9 @@ const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+Camera camera_in_plane(glm::vec3(0.0f, 0.0f, 3.0f));
+
+bool control_in_plane = true;
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true, right_first = true;
@@ -29,7 +32,9 @@ bool firstMouse = true, right_first = true;
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
-Shader *lightingShader_ptr = nullptr, *reflect_shader_ptr = nullptr;
+Shader *lightingShader_ptr = nullptr, *reflect_shader_ptr = nullptr,
+*in_plane_shader_ptr = nullptr;
+
 
 // lighting
 glm::vec3 LightPositions[]={
@@ -39,13 +44,6 @@ glm::vec3 LightPositions[]={
     glm::vec3(-1.2f, 2.0f, 0.0f)   
 };
 glm::vec3 &lightPos(LightPositions[0]);
-void char_callback(GLFWwindow *window, unsigned int codepoint)
-{
-    if (codepoint == 246)
-    {
-       
-    }
-}
 
 using namespace cy;
 using namespace std;
@@ -141,10 +139,6 @@ int main(int argc, char **argv)
 
     // build and compile our shader programs
     // ------------------------------------------------------------------
-    // Shader lightingShader("../src/shaders/cursor/cursor.vert", "../src/shaders/cursor/cursor.frag", ../src/shaders/cursor/cursor.geom");
-    // Shader lightingShader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/shadow.frag");
-    // Shader _lightingShader("../src/shaders/simple/simple.vert", "../src/shaders/simple/simple.frag");
-    // lightingShader_ptr = new Shader("../src/shaders/simple/simple.vert", "../src/shaders/simple/simple.frag");
     lightingShader_ptr = new Shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/shadow.frag");
     Shader &lightingShader = *lightingShader_ptr;
     Shader depthShader("../src/shaders/depth/depth.vert","../src/shaders/depth/depth.frag");
@@ -152,8 +146,8 @@ int main(int argc, char **argv)
     Shader &reflect_shader = *reflect_shader_ptr;
     Shader cornerShader("../src/shaders/corner/corner.vert","../src/shaders/corner/corner.frag");
     Shader screenShader("../src/shaders/screen/screen.vert", "../src/shaders/screen/screen.frag");
+    Shader out_of_plane_shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/op.frag");
     
-    glfwSetCharCallback(window, char_callback);
 
     // select buffers setup
     // ------------------------------------------------------------------
@@ -218,15 +212,16 @@ int main(int argc, char **argv)
     glEnableVertexAttribArray(1);
     
     // load models
-    // shayMesh teapot("assets/teapot/teapot.obj");
-    // Model teapot("assets/teapot/teapot.obj");
+    // shayMesh teapot("../src/assets/teapot/teapot.obj");
+    // Model teapot("../src/assets/teapot/teapot.obj");
     Model teapot(filename);
 
     // load textures (we now use a utility function to keep the code more organized)
     // ------------------------------------------------------------------
-    unsigned int diffuseMap = loadTexture("assets/teapot/brick.png");
-    unsigned int specularMap = loadTexture("assets/teapot/brick-specular.png");
-
+    unsigned int diffuseMap = loadTexture("../src/assets/teapot/brick.png");
+    unsigned int specularMap = loadTexture("../src/assets/teapot/brick-specular.png");
+    unsigned int normal_map = loadTexture("../src/assets/teapot_normal.png");
+    unsigned int disp_map = loadTexture("../src/assets/teapot_disp.png");
     cornerShader.setInt("screenTexture",0);
 
     unsigned framebuffer;
@@ -241,12 +236,11 @@ int main(int argc, char **argv)
         glGenTextures(1, &texColorBuffer);
         glBindTexture(GL_TEXTURE_2D, texColorBuffer);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-        glGenerateMipmap(GL_TEXTURE_2D);
-
 
         // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, 2.0f);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, 8.0F);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0);
@@ -259,17 +253,17 @@ int main(int argc, char **argv)
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
             std::cout << "error: framebuffer\n";
     }
-    glBindFramebuffer(GL_FRAMEBUFFER,0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     Shader skyboxShader("../src/shaders/skycube.vs", "../src/shaders/skycube.fs");
 
     vector<string> faces_files{
-        "assets/cubemap/cubemap_posx.png",
-        "assets/cubemap/cubemap_negx.png",
-        "assets/cubemap/cubemap_posy.png",
-        "assets/cubemap/cubemap_negy.png",
-        "assets/cubemap/cubemap_posz.png",
-        "assets/cubemap/cubemap_negz.png",
+        "../src/assets/cubemap/cubemap_posx.png",
+        "../src/assets/cubemap/cubemap_negx.png",
+        "../src/assets/cubemap/cubemap_posy.png",
+        "../src/assets/cubemap/cubemap_negy.png",
+        "../src/assets/cubemap/cubemap_posz.png",
+        "../src/assets/cubemap/cubemap_negz.png",
     };
     unsigned cubemap_texture = loadCubemap(faces_files);
     gen_preview_framebuffer();
@@ -279,9 +273,9 @@ int main(int argc, char **argv)
     lightingShader.use();
     lightingShader.setInt("material.diffuse", 0);
     lightingShader.setInt("material.specular", 1);
-    lightingShader.setInt("shadowMap",2);
-    
-    lightingShader.setFloat("material.shininess",2);
+    lightingShader.setInt("shadowMap", 2);
+
+    lightingShader.setFloat("material.shininess", 2);
 
     // ------------------------------------------------------------------
     // render loop
@@ -300,10 +294,11 @@ int main(int argc, char **argv)
         // render setup
         #ifdef _TO_FRAMEBUFFER_
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-        #else
+        glClearColor(0.4f, 0.4f, 0.4f, 1.0f);
+#else
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        #endif
         glClearColor(0.1f,0.1f,0.1f,1.0f);
+#endif
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_STENCIL_TEST);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
@@ -316,16 +311,14 @@ int main(int argc, char **argv)
         // render
         // ------------------------------------------------------------------
         // be sure to activate shader when setting uniforms/drawing objects
-        float scale=1.02;
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 1.0f, 100.0f);
-        glm::mat4 view = camera.GetViewMatrix();
-        glm::mat4 model = glm::mat4(1.0f);
-        glm::mat4 tmpmodel=glm::scale(model,glm::vec3(scale,scale,scale));
-        glm::vec3 box2Pos(0.3,0.0,1.2);
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         int viewport[4];
         glGetIntegerv(GL_VIEWPORT, viewport);
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 1.0f, 100.0f);
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 model = glm::mat4(1.0f);
+        glm::vec3 box2Pos(0.3, 0.0, 1.2);
         const auto use = [&] (Shader &lightingShader) {
         lightingShader.use();
         lightingShader.setMat4("projection", projection);
@@ -341,8 +334,6 @@ int main(int argc, char **argv)
          lightingShader.setMat4("lightView",glm::perspective(glm::radians(89.0f),(float)SHADOW_WIDTH/SHADOW_HEIGHT,0.1f,10.0f)*lightSpaceTrans);
         view = camera.GetViewMatrix();
         lightingShader.setVec3("objectColor", 1.0f, 0.5f, 0.31f);
-        lightingShader.setVec3("lightColor",  1.0f, 1.0f, 1.0f);
-        lightingShader.setVec3("lightPos",lightPos);
         
 
         };
@@ -355,10 +346,35 @@ int main(int argc, char **argv)
         glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture);
         lightingShader.setInt("skybox", 2);
         // bind specular map
+        
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, diffuseMap);
+
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, specularMap);
         // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         // renderScene(lightingShader);
+
+        const auto render_sky = [&]()
+        {
+            glStencilMask(0x00);
+            // skybox
+            // glDepthMask(GL_FALSE);
+            glm::mat4 skyview = glm::mat4(glm::mat3(view));
+            glDepthFunc(GL_LEQUAL);
+
+            skyboxShader.use();
+            skyboxShader.setMat4("projection", projection);
+            skyboxShader.setMat4("view", skyview);
+            // glBindVertexArray();
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture);
+            // glDrawArrays(GL_TRIANGLES, 0, 36);
+            // glDepthMask(GL_TRUE);
+            renderCube();
+            glDepthFunc(GL_LESS);
+        };
+
         const auto renderScene = [&](Shader &shader)
         {
             // renderCube();
@@ -402,45 +418,48 @@ int main(int argc, char **argv)
             shader.use();
                         shader.setMat4("model", model2);
             teapot.Draw(shader);
+            render_sky();
 
             // ----------------------------------------------------
         };
         renderScene(lightingShader);
-        {
-            glStencilMask(0x00);
-            // skybox
-            // glDepthMask(GL_FALSE);
-            glm::mat4 skyview = glm::mat4(glm::mat3(view));
-            glDepthFunc(GL_LEQUAL);
-
-            skyboxShader.use();
-            skyboxShader.setMat4("projection", projection);
-            skyboxShader.setMat4("view", skyview);
-            // glBindVertexArray();
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture);
-            // glDrawArrays(GL_TRIANGLES, 0, 36);
-            // glDepthMask(GL_TRUE);
-            renderCube();
-            glDepthFunc(GL_LESS);
-        }
 #ifdef _TO_FRAMEBUFFER_
+ {
+            glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+
+            // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glGenerateMipmap(GL_TEXTURE_2D);
+            // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, 8.0F);
+            // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, texColorBuffer, 0);
+        }
         {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            glDisable(GL_DEPTH_TEST);
+            glEnable(GL_DEPTH_TEST);
+            glEnable(GL_STENCIL_TEST);
+            glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+            glStencilFunc(GL_ALWAYS, 1, 0XFF);
+            glStencilMask(0XFF);
             glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT);
-            lightingShader.use();
-            lightingShader.setMat4("model", glm::mat4(1.0f));
-            lightingShader.setMat4("projection", projection);
-            lightingShader.setMat4("view", camera.GetViewMatrix());
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+            out_of_plane_shader.use();
+            out_of_plane_shader.setMat4("model", glm::mat4(1.0f));
+            out_of_plane_shader.setMat4("projection", projection);
+            out_of_plane_shader.setMat4("view", camera.GetViewMatrix());
+            out_of_plane_shader.setVec3("light_color", 1.0f, 1.0f, 1.0f);
+            out_of_plane_shader.setVec3("light_pos", lightPos);
+
             glBindVertexArray(quadVAO);
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, texColorBuffer);
             glDrawArrays(GL_TRIANGLES, 0, 6);
+            render_sky();
         }
-        #endif
-
+#endif
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // ------------------------------------------------------------------
         glfwSwapBuffers(window);
@@ -507,7 +526,7 @@ void processInput(GLFWwindow *window)
         glfwSetWindowShouldClose(window, true);
     if (glfwGetKey(window, GLFW_KEY_F6) == GLFW_PRESS) {
         cout << "Recompiling Shader\n";
-        // *lightingShader_ptr = Shader("../src/shaders/simple/simple.vert", "../src/shaders/simple/simple.frag");
+        *in_plane_shader_ptr = Shader("../src/shaders/simple/shadow/shadow.vert", "../src/shaders/simple/shadow/shadow.frag");
         *lightingShader_ptr = Shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/shadow.frag");
         *reflect_shader_ptr = Shader("../src/shaders/shadow/shadow1.vert", "../src/shaders/shadow/shadow.frag");
         cout << "Done\n";
