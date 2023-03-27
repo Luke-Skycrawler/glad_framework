@@ -155,7 +155,8 @@ int main(int argc, char **argv)
     // ------------------------------------------------------------------
     lightingShader_ptr = new Shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/shadow.frag");
     Shader &lightingShader = *lightingShader_ptr;
-    Shader depthShader("../src/shaders/depth/depth.vert", "../src/shaders/depth/depth.frag");
+    // Shader depthShader("../src/shaders/depth/depth.vert", "../src/shaders/depth/depth.frag");
+    Shader depthShader("../src/shaders/shadow/show_lines.vert", "../src/shaders/depth/depth.frag", nullptr, "../src/shaders/shadow/disp.tesc", "../src/shaders/shadow/disp.tese");
     reflect_shader_ptr = new Shader("../src/shaders/shadow/shadow1.vert", "../src/shaders/shadow/shadow.frag");
     Shader &reflect_shader = *reflect_shader_ptr;
     Shader cornerShader("../src/shaders/corner/corner.vert", "../src/shaders/corner/corner.frag");
@@ -261,6 +262,8 @@ int main(int argc, char **argv)
     lightingShader.setInt("material.diffuse", 0);
     glGenFramebuffers(1, &framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+
+    gen_preview_framebuffer();
     {
         glGenTextures(1, &texColorBuffer);
         glBindTexture(GL_TEXTURE_2D, texColorBuffer);
@@ -452,6 +455,7 @@ int main(int argc, char **argv)
             // ----------------------------------------------------
         };
         renderScene(lightingShader);
+
 #ifdef _TO_FRAMEBUFFER_
  {
             glBindTexture(GL_TEXTURE_2D, texColorBuffer);
@@ -487,7 +491,23 @@ int main(int argc, char **argv)
                 shader.setInt("disp_map", 0);
                 shader.setInt("normal_map", 3);
                 shader.setFloat("popup", height * 0.01);
+                shader.setInt("shadow_map", 4);
             };
+
+            {
+                glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+                glEnable(GL_DEPTH_TEST);
+                glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                out_of_plane_setup(depthShader);
+                depthShader.setMat4("projection", glm::perspective(glm::radians(89.0f), (float)SHADOW_WIDTH / SHADOW_HEIGHT, 0.1f, 10.0f));
+                depthShader.setMat4("view", glm::lookAt(lightPos, glm::vec3(0.0f), camera.WorldUp));
+                depthShader.setMat4("model", mat4(1.0f));
+                depthShader.setVec3("view_pos", lightPos);
+                renderScene(depthShader);
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            }
+
             out_of_plane_setup(out_of_plane_shader);
             glBindVertexArray(quadVAO);
             glActiveTexture(GL_TEXTURE0);
@@ -497,6 +517,8 @@ int main(int argc, char **argv)
             glBindTexture(GL_TEXTURE_2D, disp_map);
             glActiveTexture(GL_TEXTURE3);
             glBindTexture(GL_TEXTURE_2D, normal_map);
+            glActiveTexture(GL_TEXTURE4);
+            glBindTexture(GL_TEXTURE_2D, depthMap);
             #ifdef _PATCH_
             glPatchParameteri(GL_PATCH_VERTICES, 4);
             glDrawArrays(GL_PATCHES, 0, 4);

@@ -6,12 +6,14 @@ in vec2 tescTexCoords[];
 // in vec3 tescFragPos[];
 out vec2 teseTexCoords;
 out vec3 FragPos;
+out vec4 FragPosLightSpace;
 uniform sampler2D disp_map;
 
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
 uniform float popup;
+uniform mat4 lightView;
 
 vec4 interpolate(vec4 v0, vec4 v1, vec4 v2, vec4 v3) {
     vec4 a = mix(v0, v1, gl_TessCoord.x);
@@ -51,4 +53,5 @@ void main() {
         gl_in[2].gl_Position, 
         gl_in[3].gl_Position 
     )));
+    FragPosLightSpace =  lightView * vec4(FragPos, 1.0);
 }

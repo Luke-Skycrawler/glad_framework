@@ -8,7 +8,7 @@ struct Material{
 // in vec3 Normal;
 in vec3 FragPos;
 in vec2 teseTexCoords;
-// in vec4 FragPosLightSpace;
+in vec4 FragPosLightSpace;
 
 
 
@@ -20,21 +20,21 @@ uniform vec3 view_pos;
 uniform vec3 object_color;
 uniform vec3 light_color;
 uniform Material material;
-uniform sampler2D shadowMap;
+uniform sampler2D shadow_map;
 uniform sampler2D normal_map;
 uniform samplerCube skybox;
 // in vec3 CubeMapCoords;
 
-// float ShadowCalc(){
-//     vec3 projCoords = FragPosLightSpace.xyz / FragPosLightSpace.w;
-//     projCoords = projCoords * 0.5 + 0.5;
-//     if(projCoords.x<0.0||projCoords.x>1.0||projCoords.y<0.0||projCoords.y>1.0)
-//         return 1.0;
-//     float depth = texture(shadowMap,projCoords.xy).r;
-//     float currentDepth = projCoords.z;
-//     float shadow = currentDepth < depth+0.01? 1.0:0.0;
-//     return shadow;
-// }
+float ShadowCalc(){
+    vec3 projCoords = FragPosLightSpace.xyz / FragPosLightSpace.w;
+    projCoords = projCoords * 0.5 + 0.5;
+    if(projCoords.x<0.0||projCoords.x>1.0||projCoords.y<0.0||projCoords.y>1.0)
+        return 1.0;
+    float depth = texture(shadow_map,projCoords.xy).r;
+    float currentDepth = projCoords.z;
+    float shadow = currentDepth < depth+0.01? 1.0:0.0;
+    return shadow;
+}
 void main()
 {
     // vec3 normal = transpose(inverse(mat3(view))) * Normal;
@@ -58,9 +58,9 @@ void main()
     // FragColor = vec4(diffuse + specular + ambient, 1.0);
 
     reflect_dir = reflect(-view_dir, normal);
-    vec3 result = (ambient + diffuse + specular);
+    float shadow = ShadowCalc();
+    vec3 result = (ambient + diffuse + shadow * specular);
 
-    // // float shadow = ShadowCalc();
     // vec3 result = (ambient + diffuse) * texture(material.diffuse,TexCoords).rgb+ specular*texture(material.specular,TexCoords).rgb;
 
     FragColor = vec4(result, 1.0);
