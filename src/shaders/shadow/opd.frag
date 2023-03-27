@@ -5,10 +5,10 @@ struct Material{
     sampler2D specular;
     float shininess;
 };
-in vec3 Normal;
+// in vec3 Normal;
 in vec3 FragPos;
-in vec2 TexCoords;
-in vec4 FragPosLightSpace;
+in vec2 teseTexCoords;
+// in vec4 FragPosLightSpace;
 
 
 
@@ -21,8 +21,9 @@ uniform vec3 object_color;
 uniform vec3 light_color;
 uniform Material material;
 uniform sampler2D shadowMap;
+uniform sampler2D normal_map;
 uniform samplerCube skybox;
-in vec3 CubeMapCoords;
+// in vec3 CubeMapCoords;
 
 // float ShadowCalc(){
 //     vec3 projCoords = FragPosLightSpace.xyz / FragPosLightSpace.w;
@@ -36,8 +37,8 @@ in vec3 CubeMapCoords;
 // }
 void main()
 {
-    vec3 normal = transpose(inverse(mat3(view))) * Normal;
-    normal = texture(material.diffuse, TexCoords).rgb;
+    // vec3 normal = transpose(inverse(mat3(view))) * Normal;
+    vec3 normal = texture(normal_map, teseTexCoords).rgb;
     // vec3 normal = transpose(inverse(mat3(view))) * Normal;
     // vec3 normal = Normal;
     normal = normalize(normal);

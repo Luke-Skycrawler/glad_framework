@@ -161,8 +161,8 @@ int main(int argc, char **argv)
     Shader cornerShader("../src/shaders/corner/corner.vert", "../src/shaders/corner/corner.frag");
     Shader screenShader("../src/shaders/screen/screen.vert", "../src/shaders/screen/screen.frag");
     // Shader out_of_plane_shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/op.frag");
-    out_of_plane_shader_ptr = new Shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/opn.frag");
-    // out_of_plane_shader_ptr = new Shader("../src/shaders/shadow/show_lines.vert", "../src/shaders/shadow/opd.frag", "../src/shaders/shadow/disp.tese");
+    // out_of_plane_shader_ptr = new Shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/opn.frag");
+    out_of_plane_shader_ptr = new Shader("../src/shaders/shadow/show_lines.vert", "../src/shaders/shadow/opd.frag", nullptr, "../src/shaders/shadow/disp.tesc", "../src/shaders/shadow/disp.tese");
 
     Shader &out_of_plane_shader = *out_of_plane_shader_ptr;
     Shader line_segs_shader("../src/shaders/shadow/show_lines.vert", "../src/shaders/shadow/show_lines.frag", "../src/shaders/shadow/show_lines.geom", "../src/shaders/shadow/disp.tesc", "../src/shaders/shadow/disp.tese");
@@ -196,15 +196,24 @@ int main(int argc, char **argv)
          1.0f,  0.5f,  1.0f, 0.0f,
          1.0f,  1.0f,  1.0f, 1.0f
     };
+
     float quad[] = {
+#ifdef _PATCH_
+
+        -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+        -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
+        1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
+        1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f
+
+#else
         -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
         -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
         1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,
-        #ifndef _PATCH_
         -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
         1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,
-        #endif
-        1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f};
+        1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f
+#endif
+    };
     glGenVertexArrays(1, &quadVAO);
     glGenBuffers(1, &quadVBO);
     
@@ -240,7 +249,7 @@ int main(int argc, char **argv)
     // ------------------------------------------------------------------
     unsigned int diffuseMap = loadTexture("../src/assets/teapot/brick.png");
     unsigned int specularMap = loadTexture("../src/assets/teapot/brick-specular.png");
-    unsigned int normal_map = loadTexture("../src/assets/teapot_normal.png");
+    unsigned int normal_map = loadTexture("../src/assets/teapot_normal1.png");
     unsigned int disp_map = loadTexture("../src/assets/teapot_disp.png");
     cornerShader.setInt("screenTexture",0);
 
@@ -476,6 +485,7 @@ int main(int argc, char **argv)
                 shader.setVec3("light_pos", lightPos);
                 shader.setFloat("lod", lod * 1.0);
                 shader.setInt("disp_map", 0);
+                shader.setInt("normal_map", 3);
                 shader.setFloat("popup", height * 0.01);
             };
             out_of_plane_setup(out_of_plane_shader);
@@ -485,6 +495,8 @@ int main(int argc, char **argv)
 
             // glBindTexture(GL_TEXTURE_2D, normal_map);
             glBindTexture(GL_TEXTURE_2D, disp_map);
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, normal_map);
             #ifdef _PATCH_
             glPatchParameteri(GL_PATCH_VERTICES, 4);
             glDrawArrays(GL_PATCHES, 0, 4);
