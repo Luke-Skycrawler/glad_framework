@@ -8,6 +8,7 @@ uniform sampler2D disp_map;
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
+uniform float popup;
 
 vec4 interpolate(vec4 v0, vec4 v1, vec4 v2, vec4 v3) {
     vec4 a = mix(v0, v1, gl_TessCoord.x);
@@ -17,11 +18,13 @@ vec4 interpolate(vec4 v0, vec4 v1, vec4 v2, vec4 v3) {
 }
 void main() {
     gl_Position = projection * view * model * 
-    interpolate(
+    ( 
+        interpolate(
         gl_in[0].gl_Position, 
         gl_in[1].gl_Position, 
         gl_in[2].gl_Position, 
         gl_in[3].gl_Position 
-    );
+    ) + vec4(0.0, 0.0, texture(disp_map, vec2(gl_TessCoord.x, gl_TessCoord.y)).r * popup, 0.0)
+    ) ;
     
 }

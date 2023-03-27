@@ -29,6 +29,7 @@ bool control_in_plane = true;
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true, right_first = true, show_line_segs = true;
+int lod = 5, height = 20;
 
 // timing
 float deltaTime = 0.0f;
@@ -473,14 +474,17 @@ int main(int argc, char **argv)
                 shader.setMat4("view", camera.GetViewMatrix());
                 shader.setVec3("light_color", 1.0f, 1.0f, 1.0f);
                 shader.setVec3("light_pos", lightPos);
-                shader.setFloat("lod", 10);
+                shader.setFloat("lod", lod * 1.0);
+                shader.setInt("disp_map", 0);
+                shader.setFloat("popup", height * 0.01);
             };
             out_of_plane_setup(out_of_plane_shader);
             glBindVertexArray(quadVAO);
             glActiveTexture(GL_TEXTURE0);
             // glBindTexture(GL_TEXTURE_2D, texColorBuffer);
-            glBindTexture(GL_TEXTURE_2D, normal_map);
-            
+
+            // glBindTexture(GL_TEXTURE_2D, normal_map);
+            glBindTexture(GL_TEXTURE_2D, disp_map);
             #ifdef _PATCH_
             glPatchParameteri(GL_PATCH_VERTICES, 4);
             glDrawArrays(GL_PATCHES, 0, 4);
@@ -567,6 +571,17 @@ void processInput(GLFWwindow *window)
     }
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+        lod ++ ;
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+        lod -- ;
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+        height ++ ;
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+        height -- ;
+    lod = std::max(4, std::min(lod, 64));
+    height = std::max(0, std::min(height, 100));
     if (glfwGetKey(window, GLFW_KEY_F6) == GLFW_PRESS) {
         cout << "Recompiling Shader\n";
         // *out_of_plane_shader_ptr = Shader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/opn.frag");
