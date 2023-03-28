@@ -448,7 +448,7 @@ int main(int argc, char **argv)
             teapot.Draw(reflect_shader);
             glStencilFunc(GL_ALWAYS, 1, 0XFF);
             shader.use();
-                        shader.setMat4("model", model2);
+            shader.setMat4("model", model2);
             teapot.Draw(shader);
             render_sky();
 
@@ -492,6 +492,7 @@ int main(int argc, char **argv)
                 shader.setInt("normal_map", 3);
                 shader.setFloat("popup", height * 0.01);
                 shader.setInt("shadow_map", 4);
+                shader.setMat4("lightView", glm::perspective(glm::radians(89.0f), (float)SHADOW_WIDTH / SHADOW_HEIGHT, 0.1f, 10.0f) * glm::lookAt(lightPos, glm::vec3(0.0f), camera.WorldUp));
             };
 
             {
@@ -504,7 +505,14 @@ int main(int argc, char **argv)
                 depthShader.setMat4("view", glm::lookAt(lightPos, glm::vec3(0.0f), camera.WorldUp));
                 depthShader.setMat4("model", mat4(1.0f));
                 depthShader.setVec3("view_pos", lightPos);
-                renderScene(depthShader);
+                // renderScene(depthShader);
+                glBindVertexArray(quadVAO);
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, disp_map);
+                glActiveTexture(GL_TEXTURE3);
+                glBindTexture(GL_TEXTURE_2D, normal_map);
+                glPatchParameteri(GL_PATCH_VERTICES, 4);
+                glDrawArrays(GL_PATCHES, 0, 4);
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
             }
 
@@ -512,7 +520,6 @@ int main(int argc, char **argv)
             glBindVertexArray(quadVAO);
             glActiveTexture(GL_TEXTURE0);
             // glBindTexture(GL_TEXTURE_2D, texColorBuffer);
-
             // glBindTexture(GL_TEXTURE_2D, normal_map);
             glBindTexture(GL_TEXTURE_2D, disp_map);
             glActiveTexture(GL_TEXTURE3);
@@ -541,6 +548,15 @@ int main(int argc, char **argv)
             render_sky();
         }
 #endif
+        {
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glDisable(GL_DEPTH_TEST);
+            cornerShader.use();
+            glBindVertexArray(cornerVAO);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, depthMap);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // ------------------------------------------------------------------
         glfwSwapBuffers(window);
