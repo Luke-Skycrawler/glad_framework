@@ -3,4 +3,5 @@
 #include "dynamics.h"
 struct Globals {
     RigidBody* body;
+    MassSpringMesh *mesh;
 };

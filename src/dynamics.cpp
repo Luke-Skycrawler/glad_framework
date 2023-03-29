@@ -100,3 +100,55 @@ void RigidBody::step(int ts)
         S[0].x += dx;
     }
 }
+
+#include "globals.h"
+extern Globals globals;
+
+static const double M = 1.0;
+void compute_b(VectorXd &b)
+{
+    auto &vs{globals.mesh->mass_v}, &xs{globals.mesh->mass_x};
+
+    int n_mass = vs.size();
+    b.setZero(3 * n_mass);
+    for (int i = 0; i < n_mass; i++)
+    {
+        b.segment<3>(i * 3) = M * vs[i];
+    }
+    compute_force(b);
+}
+
+void compute_force(VectorXd &b)
+{
+    auto &xs{globals.mesh->mass_x};
+    for (auto &e : globals.mesh->edges)
+    {
+        int i = e.i, j = e.j;
+        vec3 xji{xs[j] - xs[i]};
+        vec3 fi = ks * (xji - e.l0 * (xji).normalized());
+        b.segment<3>(3 * i) += fi;
+        b.segment<3>(3 * j) -= fi;
+    }
+}
+void init_l0()
+{
+    auto &xs{globals.mesh->mass_x};
+    for (auto &e : globals.mesh->edges)
+    {
+        int i = e.i, j = e.j;
+        vec3 xji{xs[j] - xs[i]};
+        e.l0 = xji.norm();
+    }
+}
+
+void compute_single_spring_K(Edge &e)
+{
+    auto &xs{globals.mesh->mass_x};
+
+    vec3 xji{xs[e.j] - xs[e.i]};
+
+    mat3 K = (xji) * (xji).transpose();
+    double l = xji.norm();
+    // K = K * (kd + ks * l0)
+    K = K * ks * e.l0 / (l * l * l) + ks * mat3::Identity(3, 3) * (e.l0 - l) / l;
+}

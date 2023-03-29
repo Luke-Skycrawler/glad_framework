@@ -1,6 +1,7 @@
 #pragma once
 #include <Eigen/Eigen>
 #include <vector>
+#include <array>
 
 using namespace std;
 using namespace Eigen;
@@ -51,3 +52,20 @@ struct RigidBody{
     StateVector dSdt(const vec3 &f, int t);
     void step(int ts);
 };
+
+
+static double kd = 1e-2, ks = 1e1;
+
+struct Edge {
+    double l0;
+    int i, j;
+};
+struct MassSpringMesh {
+    vector<vec3> mass_v;
+    vector<vec3> mass_x;
+    vector<Edge> edges;
+};
+void compute_b(VectorXd &b);
+void compute_single_spring_K(const vec3 &xi, const vec3 &xj);
+void compute_force(VectorXd &b);
+void init_l0();
