@@ -118,6 +118,27 @@ void compute_b(VectorXd &b)
     compute_force(b);
 }
 
+void gen_non_zero_entries(SparseMatrix<double> &sparse_matrix)
+{
+}
+
+void compute_A(SparseMatrix<double> &sparse_matrix)
+{
+
+    for (auto &e : globals.mesh->edges)
+    {
+        auto I = e.i * 3, J = e.j * 3;
+        mat3 K = compute_single_spring_K(e);
+        for (int i = 0; i < 3; i++)
+            for (int j = 0; j < 3; j++)
+            {
+                sparse_matrix.coeffRef(i + I, j + I) = K(i, j);
+                sparse_matrix.coeffRef(i + I, j + J) = -K(i, j);
+                sparse_matrix.coeffRef(i + J, j + I) = -K(i, j);
+                sparse_matrix.coeffRef(i + J, j + J) = K(i, j);
+            }
+    }
+}
 void compute_force(VectorXd &b)
 {
     auto &xs{globals.mesh->mass_x};
@@ -141,14 +162,70 @@ void init_l0()
     }
 }
 
-void compute_single_spring_K(Edge &e)
+mat3 compute_single_spring_K(Edge &e)
 {
+    // partial f partial xi
     auto &xs{globals.mesh->mass_x};
-
+    auto &vs{globals.mesh->mass_v};
     vec3 xji{xs[e.j] - xs[e.i]};
+    vec3 vji{vs[e.j] - vs[e.i]};
 
     mat3 K = (xji) * (xji).transpose();
-    double l = xji.norm();
-    // K = K * (kd + ks * l0)
-    K = K * ks * e.l0 / (l * l * l) + ks * mat3::Identity(3, 3) * (e.l0 - l) / l;
+    double l2 = xji.squaredNorm();
+    double l = sqrt(l2);
+    mat3 term1 = mat3::Identity(3, 3) - K / l2;
+    mat3 K_spring = ks * (-mat3::Identity(3, 3) + (e.l0 / l) * term1);
+    //mat3 K_damp = -(kd / l) * vji.transpose() * term1;
+    return K_spring;
+    // return K_spring + K_damp;
+}
+
+
+void init(){
+    init_l0();
+
+}
+void implicit_euler() {
+    
+    int n_mass = globals.mesh->mass_x.size();
+    int n_unknowns = n_mass * 3;
+    SparseMatrix<double> sparse_matrix(n_unknowns, n_unknowns);
+    sparse_matrix.setZero();
+    VectorXd b;
+    b.setZero(n_unknowns);
+    compute_b(b);
+    compute_A(sparse_matrix);
+    SimplicialLDLT<SparseMatrix<double>> ldlt_solver;
+    ldlt_solver.compute(sparse_matrix);
+    VectorXd v_plus = ldlt_solver.solve(b);
+
+    for (int i = 0; i < n_mass; i ++){
+        auto vi = v_plus.segment<3>(i * 3);
+        globals.mesh ->mass_v[i] = vi;
+        globals.mesh->mass_x[i] += vi * dt;
+    } 
+}
+
+#include <set>
+void extract_edges(vector<Edge> &edges, const vector<unsigned> indices)
+{
+    set<array<unsigned, 2>> e;
+    edges.resize(0);
+    static const auto insert = [&](unsigned a, unsigned b)
+    {
+        e.insert({min(a, b), max(a, b)});
+    };
+    int n_faces = indices.size();
+    for (int i = 0; i < n_faces; i++)
+    {
+        auto t0 = indices[3 * i], t1 = indices[3 * i + 1], t2 = indices[3 * i + 2];
+        insert(t0, t1);
+        insert(t1, t2);
+        insert(t0, t2);
+    }
+    edges.reserve(e.size());
+    for (auto &ei : e)
+    {
+        edges.push_back({0.0, int(ei[0]), int(ei[1])});
+    }
 }

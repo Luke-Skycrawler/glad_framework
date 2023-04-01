@@ -210,7 +210,18 @@ int main()
         vertices[i] = vec3(p[0], p[1], p[2]);
     }
     globals.body = new RigidBody(n_vertices, vertices);
-
+    vector<Edge> edges;
+    extract_edges(edges, body.meshes[0].indices);
+    vector<vec3> velocity, position;
+    velocity.resize(vs.size());
+    position.resize(vs.size());
+    for (int i = 0; i < vs.size(); i ++){
+        auto &p {vs[i].Position};
+        position[i] = vec3(p[0], p[1], p[2]);
+    }
+    globals.mesh = new MassSpringMesh{velocity, position, edges};
+    init();
+    
     Light lights(LightPositions,4);
     // load textures (we now use a utility function to keep the code more organized)
     // ------------------------------------------------------------------
@@ -260,7 +271,8 @@ int main()
         // lightingShader.setFloat("time",currentFrame);
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
-        globals.body->step(ts++);
+        // globals.body->step(ts++);
+        implicit_euler();
         // input
         processInput(window);
         // render setup
@@ -400,6 +412,7 @@ int main()
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------
     glfwTerminate();
+    delete globals.mesh;
     return 0;
 }
 void gen_preview_framebuffer(){

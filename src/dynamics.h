@@ -66,6 +66,9 @@ struct MassSpringMesh {
     vector<Edge> edges;
 };
 void compute_b(VectorXd &b);
-void compute_single_spring_K(const vec3 &xi, const vec3 &xj);
+mat3 compute_single_spring_K(Edge &e);
 void compute_force(VectorXd &b);
 void init_l0();
+void implicit_euler();
+void init();
+void extract_edges(vector<Edge>& edges, const vector<unsigned> indices);
