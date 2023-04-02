@@ -1,5 +1,7 @@
 #include "dynamics.h"
 #include <spdlog/spdlog.h>
+#include <assert.h>
+#include <iostream>
 mat3 RigidBody::compute_K(const vec3 &r, int t)
 {
     auto &R{S[t].R};
@@ -105,7 +107,34 @@ void RigidBody::step(int ts)
 extern Globals globals;
 
 static const double M = 1.0;
-void compute_b(VectorXd &b)
+
+void compute_force(VectorXd &b, const VectorXd &v_plus)
+{
+    // b += dt * f(x + dt * v_plus)
+    auto &xs{globals.mesh->mass_x};
+    static const vec3 gravity{0.0, -9.8, 0.0};
+    for (auto &e : globals.mesh->edges)
+    {
+        int i = e.i, j = e.j;
+        vec3 xji{xs[j] - xs[i]};
+        xji += (v_plus.segment<3>(3 * j) - v_plus.segment<3>(3 * i)) * dt;
+
+        assert(xji.squaredNorm() > 0.0);
+        vec3 fi = ks * (xji - e.l0 * (xji).normalized());
+        b.segment<3>(3 * i) += fi * dt;
+        b.segment<3>(3 * j) -= fi * dt;
+    }
+    int n_mass = globals.mesh->mass_x.size();
+
+    for (int i = 0; i < n_mass; i++)
+    {
+        b.segment<3>(i * 3) += M * gravity * dt;
+    }
+}
+void compute_b(VectorXd &b, const VectorXd &v_plus)
+/****************************************
+b = M * v_t + dt * f(x_t + v_t+1 * dt)
+****************************************/
 {
     auto &vs{globals.mesh->mass_v}, &xs{globals.mesh->mass_x};
 
@@ -115,42 +144,66 @@ void compute_b(VectorXd &b)
     {
         b.segment<3>(i * 3) = M * vs[i];
     }
-    compute_force(b);
+    compute_force(b, v_plus);
+
+    //cout << b.transpose() << "\n";
 }
 
 void gen_non_zero_entries(SparseMatrix<double> &sparse_matrix)
 {
 }
 
-void compute_A(SparseMatrix<double> &sparse_matrix)
+mat3 compute_single_spring_K(Edge &e, const vec3 &vi, const vec3 &vj, bool use_v_t = true)
 {
+    // partial f partial xi
+    auto &xs{globals.mesh->mass_x};
+    auto &vs{globals.mesh->mass_v};
+    vec3 xji{xs[e.j] - xs[e.i]};
+    xji += dt * (vj - vi);
 
+    vec3 vji{vs[e.j] - vs[e.i]};
+    if (!use_v_t)
+        vji = (vj - vi);
+
+    mat3 K = (xji) * (xji).transpose();
+    double l2 = xji.squaredNorm();
+    double l = sqrt(l2);
+    mat3 term1 = mat3::Identity(3, 3) - K / l2;
+    mat3 K_spring = ks * (-mat3::Identity(3, 3) + (e.l0 / l) * term1);
+    // mat3 K_damp = -(kd / l) * vji.transpose() * term1;
+    return K_spring;
+    // return K_spring + K_damp;
+}
+
+void compute_A(SparseMatrix<double> &sparse_matrix, const VectorXd &v_n, bool use_v_t = true)
+{
+    sparse_matrix.setZero();
+
+    int n_mass = globals.mesh->mass_x.size();
+    auto &vs{globals.mesh->mass_v};
+    for (int i = 0; i < n_mass * 3; i++)
+    {
+        sparse_matrix.coeffRef(i, i) = M;
+    }
+    static const double h2_neg = -dt * dt;
     for (auto &e : globals.mesh->edges)
     {
         auto I = e.i * 3, J = e.j * 3;
-        mat3 K = compute_single_spring_K(e);
+        vec3 vi, vj;
+        vi = v_n.segment<3>(I);
+        vj = v_n.segment<3>(J);
+        mat3 K = compute_single_spring_K(e, vi, vj, use_v_t);
         for (int i = 0; i < 3; i++)
             for (int j = 0; j < 3; j++)
             {
-                sparse_matrix.coeffRef(i + I, j + I) = K(i, j);
-                sparse_matrix.coeffRef(i + I, j + J) = -K(i, j);
-                sparse_matrix.coeffRef(i + J, j + I) = -K(i, j);
-                sparse_matrix.coeffRef(i + J, j + J) = K(i, j);
+                sparse_matrix.coeffRef(i + I, j + I) += K(i, j) * h2_neg;
+                sparse_matrix.coeffRef(i + I, j + J) += -K(i, j) * h2_neg;
+                sparse_matrix.coeffRef(i + J, j + I) += -K(i, j) * h2_neg;
+                sparse_matrix.coeffRef(i + J, j + J) += K(i, j) * h2_neg;
             }
     }
 }
-void compute_force(VectorXd &b)
-{
-    auto &xs{globals.mesh->mass_x};
-    for (auto &e : globals.mesh->edges)
-    {
-        int i = e.i, j = e.j;
-        vec3 xji{xs[j] - xs[i]};
-        vec3 fi = ks * (xji - e.l0 * (xji).normalized());
-        b.segment<3>(3 * i) += fi;
-        b.segment<3>(3 * j) -= fi;
-    }
-}
+
 void init_l0()
 {
     auto &xs{globals.mesh->mass_x};
@@ -162,48 +215,69 @@ void init_l0()
     }
 }
 
-mat3 compute_single_spring_K(Edge &e)
+void init()
 {
-    // partial f partial xi
-    auto &xs{globals.mesh->mass_x};
-    auto &vs{globals.mesh->mass_v};
-    vec3 xji{xs[e.j] - xs[e.i]};
-    vec3 vji{vs[e.j] - vs[e.i]};
-
-    mat3 K = (xji) * (xji).transpose();
-    double l2 = xji.squaredNorm();
-    double l = sqrt(l2);
-    mat3 term1 = mat3::Identity(3, 3) - K / l2;
-    mat3 K_spring = ks * (-mat3::Identity(3, 3) + (e.l0 / l) * term1);
-    //mat3 K_damp = -(kd / l) * vji.transpose() * term1;
-    return K_spring;
-    // return K_spring + K_damp;
-}
-
-
-void init(){
     init_l0();
-
 }
-void implicit_euler() {
-    
-    int n_mass = globals.mesh->mass_x.size();
-    int n_unknowns = n_mass * 3;
-    SparseMatrix<double> sparse_matrix(n_unknowns, n_unknowns);
-    sparse_matrix.setZero();
-    VectorXd b;
-    b.setZero(n_unknowns);
-    compute_b(b);
-    compute_A(sparse_matrix);
-    SimplicialLDLT<SparseMatrix<double>> ldlt_solver;
-    ldlt_solver.compute(sparse_matrix);
-    VectorXd v_plus = ldlt_solver.solve(b);
 
+static const double tol = 1e-4;
+static const int max_iters = 100;
+
+VectorXd cat(const vector<vec3> &v)
+{
+    VectorXd ret;
+    int n_mass = v.size();
+    ret.setZero(n_mass * 3);
+    for (int i = 0; i < n_mass; i++)
+    {
+        ret.segment<3>(i * 3) = v[i];
+    }
+    return ret;
+}
+
+void implicit_euler()
+{
+
+    int n_mass = globals.mesh->mass_x.size();
+    auto &vs{globals.mesh->mass_v};
+
+    int n_unknowns = n_mass * 3;
+    VectorXd b, v_plus;
+    SparseMatrix<double> sparse_matrix(n_unknowns, n_unknowns);
+    b.setZero(n_unknowns);
+    v_plus.setZero(n_unknowns);
+    int iter = 0;
+    do
+    {
+        // Newton iteration
+
+        compute_b(b, v_plus);
+        // 1st iter v_plus = 0, b = M * v_t + dt * f(x_t)
+
+        compute_A(sparse_matrix, v_plus, iter == 0);
+        SimplicialLDLT<SparseMatrix<double>> ldlt_solver;
+        ldlt_solver.compute(sparse_matrix);
+        v_plus = ldlt_solver.solve(b);
+        double residue;
+        {
+
+            VectorXd f = M * (cat(vs) - v_plus);
+            compute_force(f, v_plus);
+            // f += dt * f(x + dt * v_plus)
+            residue = f.norm();
+        }
+        bool term_cond = residue < tol;
+        if (term_cond)
+            break;
+        if (++iter >= max_iters)
+            break;
+    } while (true);
+    cout << "iter = " << iter << ", norm v = " << v_plus.norm() << "\n";
     for (int i = 0; i < n_mass; i ++){
         auto vi = v_plus.segment<3>(i * 3);
         globals.mesh ->mass_v[i] = vi;
         globals.mesh->mass_x[i] += vi * dt;
-    } 
+    }
 }
 
 #include <set>
@@ -215,7 +289,7 @@ void extract_edges(vector<Edge> &edges, const vector<unsigned> indices)
     {
         e.insert({min(a, b), max(a, b)});
     };
-    int n_faces = indices.size();
+    int n_faces = indices.size() / 3;
     for (int i = 0; i < n_faces; i++)
     {
         auto t0 = indices[3 * i], t1 = indices[3 * i + 1], t2 = indices[3 * i + 2];

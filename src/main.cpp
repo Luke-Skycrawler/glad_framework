@@ -196,17 +196,15 @@ int main()
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,4*sizeof(float),(void*)(2*sizeof(float)));
     glEnableVertexAttribArray(1);
-    
-    // load models 
-    Model body("../src/assets/dragon_8kface.obj");
+
+    // load models
+    // Model body("../src/assets/dragon_8kface.obj");
+    Model body("../src/assets/cube.obj");
     auto& vs{ body.meshes[0].vertices };
     int n_vertices = vs.size();
     vec3* vertices = new vec3[n_vertices];
-    float scale = 5.0f;
     for (int i = 0; i < n_vertices; i++) {
         auto &p {vs[i].Position};
-        p /= scale;
-        // vec3 p{-0.5 + (i / 4), -0.5 + (i / 2 % 2), -0.5 + i % 2};
         vertices[i] = vec3(p[0], p[1], p[2]);
     }
     globals.body = new RigidBody(n_vertices, vertices);
@@ -218,6 +216,7 @@ int main()
     for (int i = 0; i < vs.size(); i ++){
         auto &p {vs[i].Position};
         position[i] = vec3(p[0], p[1], p[2]);
+        velocity[i] = vec3(0.0, 0.0, 0.0);
     }
     globals.mesh = new MassSpringMesh{velocity, position, edges};
     init();
@@ -273,6 +272,12 @@ int main()
         lastFrame = currentFrame;
         // globals.body->step(ts++);
         implicit_euler();
+        for (int i = 0; i < vs.size(); i++)
+        {
+            auto &p{globals.mesh->mass_x[i]};
+            vs[i].Position = glm::vec3(p[0], p[1], p[2]);
+        }
+        body.meshes[0].update_data();
         // input
         processInput(window);
         // render setup
@@ -336,6 +341,7 @@ int main()
             //model = glm::translate(model, from_eigen(globals.body ->S[0].x));
             //shader.setMat4("model", model);
             shader.setVec3("objectColor", 1.0f, 1.0f, 1.0f);
+            
             body.Draw(shader);
         };
         if(display_corner){
@@ -387,7 +393,7 @@ int main()
         }
         renderScene(lightingShader);
         // also draw the lamp object
-        lights.Draw(camera);
+        // lights.Draw(camera);
 
         if(display_corner){
             glBindFramebuffer(GL_FRAMEBUFFER,0);

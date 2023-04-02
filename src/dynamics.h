@@ -9,8 +9,8 @@ using vec3 = Vector3d;
 using mat3 = Matrix3d;
 
 static const double dt = 1e-3,
-    bound = 1.0,
-    eps = 1e-1;
+                    bound = 1.0,
+                    eps = 1e-1;
 inline mat3 skew(const vec3 & r){
     mat3 ret;
     ret.setZero(3,3);
@@ -65,10 +65,12 @@ struct MassSpringMesh {
     vector<vec3> mass_x;
     vector<Edge> edges;
 };
-void compute_b(VectorXd &b);
-mat3 compute_single_spring_K(Edge &e);
-void compute_force(VectorXd &b);
-void init_l0();
+// void compute_b(VectorXd &b, const VectorXd &v_plus);
+// // M * v_t + dt * f(x_t + v_t+1 * dt)
+// mat3 compute_single_spring_K(Edge &e, const vec3 &vi, const vec3 &vj);
+// void compute_force(VectorXd &b, const VectorXd &v_plus);
+// // b += dt * f(x + v * dt)
+// void init_l0();
 void implicit_euler();
 void init();
 void extract_edges(vector<Edge>& edges, const vector<unsigned> indices);
