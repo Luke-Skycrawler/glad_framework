@@ -34,6 +34,120 @@ float lastFrame = 0.0f;
 
 bool concentric = true, implicit = false;
 
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+vector<Eigen::Vector3f> read_obj(const string &filename,
+                                 vector<unsigned> &indices)
+{
+    vector<Eigen::Vector3f> vertices;
+    ifstream infile(filename);
+    indices.resize(0);
+    string line;
+    while (getline(infile, line))
+    {
+        istringstream iss(line);
+        string prefix;
+        iss >> prefix;
+        if (prefix == "v")
+        {
+            double x, y, z;
+            iss >> x >> y >> z;
+            Eigen::Vector3f vertex(x, y, z);
+            // string key = to_string(x) + "," + to_string(y) + "," + to_string(z);
+            // auto it = vertexMap.find(key);
+            // if (it == vertexMap.end())
+            // {
+            //     vertexMap[key] = vertices.size();
+            //     vertices.push_back(vertex);
+            // }
+            vertices.push_back(vertex);
+        }
+        else if (prefix == "f")
+        {
+            int v1, v2, v3;
+            iss >> v1 >> v2 >> v3;
+            // Eigen::Vector3i index;
+
+            // index << v1 - 1, v2 - 1, v3 - 1;
+            // indices.push_back(index);
+            indices.push_back(v1 - 1);
+            indices.push_back(v2 - 1);
+            indices.push_back(v3 - 1);
+        }
+    }
+    return vertices;
+}
+
+struct shayMesh
+{
+
+    vector<Vector3f> vertices;
+    vector<unsigned> indices;
+    int nv, nf;
+    shayMesh(const string &filename)
+    {
+
+        vertices = read_obj(filename, indices);
+        nv = vertices.size();
+        nf = indices.size() / 3;
+        setupMesh();
+    }
+    unsigned vao, vbo, ebo;
+    void setupMesh()
+    {
+        // create buffers/arrays
+        glGenVertexArrays(1, &vao);
+        glGenBuffers(1, &vbo);
+        glGenBuffers(1, &ebo);
+
+        glBindVertexArray(vao);
+        // load data into vertex buffers
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        // A great thing about structs is that their memory layout is sequential for all its items.
+        // The effect is that we can simply pass a pointer to the struct and it translates perfectly to a glm::vec3/2 array which
+        // again translates to 3/2 floats which translates to a byte array.
+        glBufferData(GL_ARRAY_BUFFER, nv * sizeof(Vector3f), vertices.data(), GL_STATIC_DRAW);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, nf * sizeof(int) * 3, indices.data(), GL_STATIC_DRAW);
+
+        // set the vertex attribute pointers
+        // vertex Positions
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vector3f), (void *)0);
+    }
+
+    void draw()
+    {
+        glBindVertexArray(vao);
+        glDrawElements(GL_TRIANGLES, nf * 3, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+    }
+
+    void update_positions()
+    {
+        glBindVertexArray(vao);
+        // load data into vertex buffers
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        // A great thing about structs is that their memory layout is sequential for all its items.
+        // The effect is that we can simply pass a pointer to the struct and it translates perfectly to a glm::vec3/2 array which
+        // again translates to 3/2 floats which translates to a byte array.
+        glBufferData(GL_ARRAY_BUFFER, nv * sizeof(Vector3f), vertices.data(), GL_STATIC_DRAW);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, nf * sizeof(int) * 3, indices.data(), GL_STATIC_DRAW);
+
+        // set the vertex attribute pointers
+        // vertex Positions
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vector3f), (void *)0);
+    }
+};
+
 // lighting
 glm::vec3 LightPositions[]={
     glm::vec3(0.0f, 0.0f, 2.5f),
@@ -199,7 +313,11 @@ int main()
 
     // load models
     // Model body("../src/assets/dragon_8kface.obj");
-    Model body("../src/assets/cube.obj");
+    // Model body("../src/assets/cube.obj");
+    Model body("../src/assets/tri.obj");
+
+    shayMesh body2("../src/assets/cube.obj");
+
     auto& vs{ body.meshes[0].vertices };
     int n_vertices = vs.size();
     vec3* vertices = new vec3[n_vertices];
@@ -209,12 +327,17 @@ int main()
     }
     globals.body = new RigidBody(n_vertices, vertices);
     vector<Edge> edges;
-    extract_edges(edges, body.meshes[0].indices);
+
+    // extract_edges(edges, body.meshes[0].indices);
+    extract_edges(edges, body2.indices);
     vector<vec3> velocity, position;
-    velocity.resize(vs.size());
-    position.resize(vs.size());
-    for (int i = 0; i < vs.size(); i ++){
-        auto &p {vs[i].Position};
+
+    auto &vert{body2.vertices};
+    velocity.resize(vert.size());
+    position.resize(vert.size());
+    for (int i = 0; i < vert.size(); i++)
+    {
+        auto &p{vert[i]};
         position[i] = vec3(p[0], p[1], p[2]);
         velocity[i] = vec3(0.0, 0.0, 0.0);
     }
@@ -278,6 +401,7 @@ int main()
             vs[i].Position = glm::vec3(p[0], p[1], p[2]);
         }
         body.meshes[0].update_data();
+        body2.update_positions();
         // input
         processInput(window);
         // render setup
@@ -341,8 +465,9 @@ int main()
             //model = glm::translate(model, from_eigen(globals.body ->S[0].x));
             //shader.setMat4("model", model);
             shader.setVec3("objectColor", 1.0f, 1.0f, 1.0f);
-            
-            body.Draw(shader);
+
+            // body.Draw(shader);
+            body2.draw();
         };
         if(display_corner){
             glBindFramebuffer(GL_FRAMEBUFFER,depthMapFBO);
@@ -484,7 +609,11 @@ void char_callback(GLFWwindow* window, unsigned int codepoint)
         display_corner=!display_corner;
     if (codepoint == 'l')
         move_light=!move_light;
-    
+
+    if (codepoint == 'r')
+    {
+        // init();
+    }
 }
 void renderPlane(){
 

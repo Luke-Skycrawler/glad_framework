@@ -121,15 +121,19 @@ void compute_force(VectorXd &b, const VectorXd &v_plus)
 
         assert(xji.squaredNorm() > 0.0);
         vec3 fi = ks * (xji - e.l0 * (xji).normalized());
+        if (fi.squaredNorm() > 0.01)
+        {
+            cout << fi.transpose() << "\n";
+        }
         b.segment<3>(3 * i) += fi * dt;
         b.segment<3>(3 * j) -= fi * dt;
     }
     int n_mass = globals.mesh->mass_x.size();
 
-    for (int i = 0; i < n_mass; i++)
-    {
-        b.segment<3>(i * 3) += M * gravity * dt;
-    }
+    // for (int i = 0; i < n_mass; i++)
+    //{
+    //     b.segment<3>(i * 3) += M * gravity * dt;
+    // }
 }
 void compute_b(VectorXd &b, const VectorXd &v_plus)
 /****************************************
@@ -146,7 +150,7 @@ b = M * v_t + dt * f(x_t + v_t+1 * dt)
     }
     compute_force(b, v_plus);
 
-    //cout << b.transpose() << "\n";
+    // cout << b.transpose() << "\n";
 }
 
 void gen_non_zero_entries(SparseMatrix<double> &sparse_matrix)
@@ -218,6 +222,7 @@ void init_l0()
 void init()
 {
     init_l0();
+    globals.mesh->mass_x[0] += vec3{0.0, 0.0, 0.3};
 }
 
 static const double tol = 1e-4;
@@ -273,9 +278,10 @@ void implicit_euler()
             break;
     } while (true);
     cout << "iter = " << iter << ", norm v = " << v_plus.norm() << "\n";
-    for (int i = 0; i < n_mass; i ++){
+    for (int i = 0; i < n_mass; i++)
+    {
         auto vi = v_plus.segment<3>(i * 3);
-        globals.mesh ->mass_v[i] = vi;
+        globals.mesh->mass_v[i] = vi;
         globals.mesh->mass_x[i] += vi * dt;
     }
 }
