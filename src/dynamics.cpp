@@ -123,17 +123,33 @@ void compute_force(VectorXd &b, const VectorXd &v_plus)
         vec3 fi = ks * (xji - e.l0 * (xji).normalized());
         if (fi.squaredNorm() > 0.01)
         {
-            cout << fi.transpose() << "\n";
+            // cout << fi.transpose() << "\n";
         }
         b.segment<3>(3 * i) += fi * dt;
         b.segment<3>(3 * j) -= fi * dt;
     }
     int n_mass = globals.mesh->mass_x.size();
 
-    // for (int i = 0; i < n_mass; i++)
-    //{
-    //     b.segment<3>(i * 3) += M * gravity * dt;
-    // }
+    for (int i = 0; i < n_mass; i++)
+    {
+        b.segment<3>(i * 3) += M * gravity * dt;
+
+        // vec3 vi{v_plus.segment<3>(i * 3)};
+        // vec3 xi{xs[i] + vi * dt};
+        // vec3 dv{0.0, 0.0, 0.0};
+        // vec3 dx{0.0, 0.0, 0.0};
+        // for (int k = 0; k < 3; k++)
+        //     if (abs(xi(k)) > bound && vi(k) * xi(k) > 0.0)
+        //     {
+        //         dv(k) += -vi(k) * (1.0 + eps);
+
+        //         // if (xi(k) > 0.0)
+        //         //     dx(k) += bound - xi(k);
+        //         // else
+        //         //     dx(k) += -bound - xi(k);
+        //     }
+        // b.segment<3>(i * 3) += M * dv;
+    }
 }
 void compute_b(VectorXd &b, const VectorXd &v_plus)
 /****************************************
@@ -182,7 +198,7 @@ mat3 compute_single_spring_K(Edge &e, const vec3 &vi, const vec3 &vj, bool use_v
 void compute_A(SparseMatrix<double> &sparse_matrix, const VectorXd &v_n, bool use_v_t = true)
 {
     sparse_matrix.setZero();
-
+    auto &xs{globals.mesh->mass_x};
     int n_mass = globals.mesh->mass_x.size();
     auto &vs{globals.mesh->mass_v};
     for (int i = 0; i < n_mass * 3; i++)
@@ -206,6 +222,23 @@ void compute_A(SparseMatrix<double> &sparse_matrix, const VectorXd &v_n, bool us
                 sparse_matrix.coeffRef(i + J, j + J) += K(i, j) * h2_neg;
             }
     }
+    // for (int i = 0; i < n_mass; i++)
+    // {
+    //     vec3 vi{v_n.segment<3>(i * 3)};
+    //     vec3 xi{xs[i] + vi * dt};
+    //     vec3 dv{0.0, 0.0, 0.0};
+    //     vec3 dx{0.0, 0.0, 0.0};
+    //     for (int k = 0; k < 3; k++)
+    //         if (abs(xi(k)) > bound && vi(k) * xi(k) > 0.0)
+    //         {
+    //             dv(k) += -vi(k) * (1.0 + eps);
+    //             sparse_matrix.coeffRef(k + i * 3, k + i * 3) += - M * (1.0 + eps) / dt;
+    //             // if (xi(k) > 0.0)
+    //             //     dx(k) += bound - xi(k);
+    //             // else
+    //             //     dx(k) += -bound - xi(k);
+    //         }
+    // }
 }
 
 void init_l0()
@@ -222,7 +255,7 @@ void init_l0()
 void init()
 {
     init_l0();
-    globals.mesh->mass_x[0] += vec3{0.0, 0.0, 0.3};
+    // globals.mesh->mass_x[0] += vec3{0.0, 0.0, 0.3};
 }
 
 static const double tol = 1e-4;
@@ -245,6 +278,7 @@ void implicit_euler()
 
     int n_mass = globals.mesh->mass_x.size();
     auto &vs{globals.mesh->mass_v};
+    auto &xs{globals.mesh->mass_x};
 
     int n_unknowns = n_mass * 3;
     VectorXd b, v_plus;
@@ -281,8 +315,24 @@ void implicit_euler()
     for (int i = 0; i < n_mass; i++)
     {
         auto vi = v_plus.segment<3>(i * 3);
-        globals.mesh->mass_v[i] = vi;
-        globals.mesh->mass_x[i] += vi * dt;
+        vs[i] = vi;
+        xs[i] += vi * dt;
+        vec3 xi{xs[i]};
+        vec3 dv{0.0, 0.0, 0.0};
+        vec3 dx{0.0, 0.0, 0.0};
+        for (int k = 0; k < 3; k++)
+            if (abs(xi(k)) > bound && vi(k) * xi(k) > 0.0)
+            {
+                dv(k) += -vi(k) * (1.0 + eps);
+
+                if (xi(k) > 0.0)
+                    dx(k) += bound - xi(k);
+                else
+                    dx(k) += -bound - xi(k);
+            }
+        // b.segment<3>(i * 3) += M * dv;
+        vs[i] += dv;
+        xs[i] += dx;
     }
 }
 
