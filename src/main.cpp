@@ -39,9 +39,10 @@ bool concentric = true, implicit = false;
 #include <sstream>
 #include <string>
 #include <vector>
+vector<unsigned> bar_geometry(vector<vec3>& xcs);
 
-vector<Eigen::Vector3f> read_obj(const string &filename,
-                                 vector<unsigned> &indices)
+    vector<Eigen::Vector3f> read_obj(const string &filename,
+                                     vector<unsigned> &indices)
 {
     vector<Eigen::Vector3f> vertices;
     ifstream infile(filename);
@@ -96,6 +97,20 @@ struct shayMesh
         nf = indices.size() / 3;
         setupMesh();
     }
+
+    shayMesh(const vector<vec3> &xcs, const vector<unsigned> &indices)
+    {
+        nv = xcs.size();
+        nf = indices.size() / 3;
+        vertices.resize(nv);
+        for (int i = 0; i < nv; i++)
+        {
+            vertices[i] = Vector3f(xcs[i][0], xcs[i][1], xcs[i][2]);
+        }
+        this->indices = indices;
+        setupMesh();
+    }
+
     unsigned vao, vbo, ebo;
     void setupMesh()
     {
@@ -110,10 +125,10 @@ struct shayMesh
         // A great thing about structs is that their memory layout is sequential for all its items.
         // The effect is that we can simply pass a pointer to the struct and it translates perfectly to a glm::vec3/2 array which
         // again translates to 3/2 floats which translates to a byte array.
-        glBufferData(GL_ARRAY_BUFFER, nv * sizeof(Vector3f), vertices.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, nv * sizeof(Vector3f), vertices.data(), GL_DYNAMIC_DRAW);
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, nf * sizeof(int) * 3, indices.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, nf * sizeof(int) * 3, indices.data(), GL_DYNAMIC_DRAW);
 
         // set the vertex attribute pointers
         // vertex Positions
@@ -136,10 +151,10 @@ struct shayMesh
         // A great thing about structs is that their memory layout is sequential for all its items.
         // The effect is that we can simply pass a pointer to the struct and it translates perfectly to a glm::vec3/2 array which
         // again translates to 3/2 floats which translates to a byte array.
-        glBufferData(GL_ARRAY_BUFFER, nv * sizeof(Vector3f), vertices.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, nv * sizeof(Vector3f), vertices.data(), GL_DYNAMIC_DRAW);
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, nf * sizeof(int) * 3, indices.data(), GL_STATIC_DRAW);
+        // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+        // glBufferData(GL_ELEMENT_ARRAY_BUFFER, nf * sizeof(int) * 3, indices.data(), GL_STATIC_DRAW);
 
         // set the vertex attribute pointers
         // vertex Positions
@@ -316,7 +331,6 @@ int main()
     // Model body("../src/assets/cube.obj");
     Model body("../src/assets/tri.obj");
 
-    shayMesh body2("../src/assets/cube.obj");
 
     auto& vs{ body.meshes[0].vertices };
     int n_vertices = vs.size();
@@ -326,12 +340,14 @@ int main()
         vertices[i] = vec3(p[0], p[1], p[2]);
     }
     globals.body = new RigidBody(n_vertices, vertices);
-    vector<Edge> edges;
 
+#ifdef CUBE_CASE
+    shayMesh body2("../src/assets/cube.obj");
+
+    vector<Edge> edges;
     // extract_edges(edges, body.meshes[0].indices);
     extract_edges(edges, body2.indices);
     vector<vec3> velocity, position;
-
     auto &vert{body2.vertices};
     velocity.resize(vert.size());
     position.resize(vert.size());
@@ -342,9 +358,20 @@ int main()
         velocity[i] = vec3(0.0, 0.0, 0.0);
     }
     globals.mesh = new MassSpringMesh{velocity, position, edges};
+#else
+    vector<vec3> xcs, vcs;
+    auto bar_indices = bar_geometry(xcs);
+    vector<Edge> bar_edges;
+    extract_edges(bar_edges, bar_indices);
+    shayMesh body2(xcs, bar_indices);
+    for (int i = 0; i < xcs.size(); i++)
+        vcs[i] = vec3(0.0, 0.0, 0.0);
+    globals.mesh = new MassSpringMesh{vcs, xcs, bar_edges};
+    auto &vert {body2.vertices};
+#endif
     init();
-    
-    Light lights(LightPositions,4);
+
+    Light lights(LightPositions, 4);
     // load textures (we now use a utility function to keep the code more organized)
     // ------------------------------------------------------------------
     unsigned int diffuseMap = loadTexture("../src/assets/wood.png");
@@ -395,10 +422,10 @@ int main()
         lastFrame = currentFrame;
         // globals.body->step(ts++);
         implicit_euler();
-        for (int i = 0; i < vs.size(); i++)
+        for (int i = 0; i < vert.size(); i++)
         {
             auto &p{globals.mesh->mass_x[i]};
-            vs[i].Position = glm::vec3(p[0], p[1], p[2]);
+            vert[i] = Vector3f(p[0], p[1], p[2]);
         }
         body.meshes[0].update_data();
         body2.update_positions();
@@ -812,4 +839,75 @@ void click_callback(GLFWwindow* window,int button,int action,int mods){
 //    auto proj_t = camera.Front / camera.Front[2] * -(z_camera + 0.5f);
 //    globals.body.force(proj_t[0], proj_t[1]);
 //}
+}
+
+vector<unsigned> bar_geometry(vector<vec3> &xcs)
+{
+    double L = 1.0, w = 0.2;
+    int n_x = 20, n_yz = 4;
+    double dx = L / n_x;
+    static const int faces[][4] = {
+        {0, 1, 3, 2},
+        {4, 5, 1, 0},
+        {2, 3, 7, 6},
+        {4, 0, 2, 6},
+        {1, 5, 7, 3},
+        {5, 4, 6, 7}};
+    int n_elements = n_yz * n_yz * n_x;
+    int n_nodes = (n_yz + 1) * (n_yz + 1) * (n_x + 1);
+    int n_boundary_elements = n_yz * n_x * 4;
+    const auto _trans = [=](int I)
+    {
+        int i = I / (n_yz * n_yz);
+        int i_yz = I % (n_yz * n_yz);
+        int j = i_yz / n_yz;
+        int k = i_yz % n_yz;
+        return (n_yz + 1) * (n_yz + 1) * i + (n_yz + 1) * j + k;
+    };
+    const auto trans = [=](int I) -> unsigned
+    {
+        int i = I / 4;
+        int j = I % 4 / 2;
+        int k = I % 2;
+        return (n_yz + 1) * (n_yz + 1) * i + (n_yz + 1) * j + k;
+    };
+    auto nodes = new int[n_elements][8];
+    vector<unsigned> indices;
+    indices.resize(n_elements * 36);
+    for (int e = 0; e < n_elements; e++)
+    {
+        e = _trans(e);
+        for (int i = 0; i < 2; i++)
+            for (int j = 0; j < 2; j++)
+                for (int k = 0; k < 2; k++)
+                {
+                    int I = e + i * (n_yz + 1) * (n_yz + 1) + j * (n_yz + 1) + k;
+                    int J = i * 4 + j * 2 + k;
+                    nodes[e][J] = I;
+                }
+        for (int i = 0; i < 6; i++)
+        {
+            indices[e * 36 + i * 6 + 0] = trans(faces[i][0]) + e;
+            indices[e * 36 + i * 6 + 1] = trans(faces[i][1]) + e;
+            indices[e * 36 + i * 6 + 2] = trans(faces[i][2]) + e;
+            indices[e * 36 + i * 6 + 3] = trans(faces[i][3]) + e;
+            indices[e * 36 + i * 6 + 4] = trans(faces[i][4]) + e;
+            indices[e * 36 + i * 6 + 5] = trans(faces[i][5]) + e;
+        }
+    }
+    xcs.resize(n_nodes);
+    const auto xc = [=](int I) -> vec3
+    {
+        int i = I / ((n_yz + 1) * (n_yz + 1));
+        int i_yz = I % ((n_yz + 1) * (n_yz + 1));
+        int j = i_yz / (n_yz + 1);
+        int k = i_yz % (n_yz + 1);
+
+        return vec3{i * 1.0 , j * 1.0, k * 1.0} * dx;
+    };
+    for (int i = 0; i < n_nodes; i++)
+    {
+        xcs[i] = xc(i);
+    }
+    return indices;
 }
