@@ -195,16 +195,60 @@ mat3 compute_single_spring_K(Edge &e, const vec3 &vi, const vec3 &vj, bool use_v
     // return K_spring + K_damp;
 }
 
+inline int starting_offset(int i, int j, const std::map<std::array<int, 2>, int> &lut, int *outers)
+{
+    auto it = lut.find({i, j});
+    int k = it->second;
+    return k * 3 + outers[j * 3];
+}
+
+inline int stride(int j, int *outers)
+{
+    return outers[j * 3 + 1] - outers[j * 3];
+    // full 3x3 matrix, no overflow issue
+}
+
+void put(double *values, int offset, int _stride, const mat3 &block)
+{
+    for (int j = 0; j < 3; j++)
+        for (int i = 0; i < 3; i++)
+        {
+            values[offset + _stride * j + i] += block(i, j);
+        }
+}
+
 void compute_A(SparseMatrix<double> &sparse_matrix, const VectorXd &v_n, bool use_v_t = true)
 {
     sparse_matrix.setZero();
     auto &xs{globals.mesh->mass_x};
     int n_mass = globals.mesh->mass_x.size();
     auto &vs{globals.mesh->mass_v};
+#define FANCY
+
+#ifdef FANCY
+
+    // TODO:  move this to initialization
+    map<array<int, 2>, int> lut;
+    gen_empty_sm(n_mass, globals.mesh->edges, sparse_matrix, lut);
+
+    auto outers = sparse_matrix.outerIndexPtr();
+    auto values = sparse_matrix.valuePtr();
+    for (int k = 0; k < n_mass; k++)
+    {
+        int offset = starting_offset(k, k, lut, outers);
+        int _stride = stride(k, outers);
+        for (int i = 0; i < 3; i++)
+        {
+            values[offset + _stride * i + i] = M;
+        }
+    }
+#endif
+#ifdef NO_FANCY
     for (int i = 0; i < n_mass * 3; i++)
     {
         sparse_matrix.coeffRef(i, i) = M;
     }
+#endif
     static const double h2_neg = -dt * dt;
     for (auto &e : globals.mesh->edges)
     {
@@ -213,6 +257,18 @@ void compute_A(SparseMatrix<double> &sparse_matrix, const VectorXd &v_n, bool us
         vi = v_n.segment<3>(I);
         vj = v_n.segment<3>(J);
         mat3 K = compute_single_spring_K(e, vi, vj, use_v_t);
+
+#ifdef FANCY
+        int ii = e.i, jj = e.j;
+        auto stride_j = stride(jj, outers), stride_i = stride(ii, outers);
+        auto oii = starting_offset(ii, ii, lut, outers), ojj = starting_offset(jj, jj, lut, outers), oij = starting_offset(ii, jj, lut, outers), oji = starting_offset(jj, ii, lut, outers);
+
+        put(values, oii, stride_i, K * h2_neg);
+        put(values, oij, stride_j, -K * h2_neg);
+        put(values, oji, stride_i, -K * h2_neg);
+        put(values, ojj, stride_j, K * h2_neg);
+#endif
+#ifdef NO_FANCY
         for (int i = 0; i < 3; i++)
             for (int j = 0; j < 3; j++)
             {
@@ -221,6 +277,7 @@ void compute_A(SparseMatrix<double> &sparse_matrix, const VectorXd &v_n, bool us
                 sparse_matrix.coeffRef(i + J, j + I) += -K(i, j) * h2_neg;
                 sparse_matrix.coeffRef(i + J, j + J) += K(i, j) * h2_neg;
             }
+#endif
     }
     // for (int i = 0; i < n_mass; i++)
     // {
@@ -317,6 +374,8 @@ void implicit_euler()
         auto vi = v_plus.segment<3>(i * 3);
         vs[i] = vi;
         xs[i] += vi * dt;
+
+#ifdef BOUND_ENABLED
         vec3 xi{xs[i]};
         vec3 dv{0.0, 0.0, 0.0};
         vec3 dx{0.0, 0.0, 0.0};
@@ -333,6 +392,7 @@ void implicit_euler()
         // b.segment<3>(i * 3) += M * dv;
         vs[i] += dv;
         xs[i] += dx;
+#endif
     }
 }
 
@@ -358,4 +418,59 @@ void extract_edges(vector<Edge> &edges, const vector<unsigned> indices)
     {
         edges.push_back({0.0, int(ei[0]), int(ei[1])});
     }
+}
+
+void gen_empty_sm(
+    int n_mass,
+    // vector<array<int, 4>>& idx,
+    // vector<array<int, 4>>& eidx,
+    vector<Edge> &edges,
+    SparseMatrix<double> &sparse_hess,
+    map<array<int, 2>, int> &lut)
+{
+    static const int n_submat = 3;
+    static set<array<int, 2>> cset;
+    cset.clear();
+    const auto insert = [&](int a, int b)
+    {
+        cset.insert({a, b});
+        cset.insert({b, a});
+    };
+    for (auto &e : edges)
+        insert(e.i, e.j);
+    for (int i = 0; i < n_mass; i++)
+        cset.insert({i, i});
+
+    auto old = cset.begin();
+    auto old_col = (*old)[0];
+    for (auto it = cset.begin();; it++)
+    {
+        if (it == cset.end() || (*it)[0] != old_col)
+        {
+            for (int c = 0; c < n_submat; c++)
+            {
+
+                auto cc = c + old_col * n_submat;
+                sparse_hess.startVec(cc);
+                int k = 0;
+                for (auto kt = old; kt != it; ++kt)
+                {
+                    lut[{(*kt)[1], (*kt)[0]}] = k++;
+                    auto row = (*kt)[1];
+                    for (int r = 0; r < n_submat; r++)
+                    {
+                        auto rr = row * n_submat + r;
+                        sparse_hess.insertBack(rr, cc) = 0.0;
+                    }
+                }
+            }
+            if (it == cset.end())
+                break;
+            old = it;
+            old_col = (*it)[0];
+        }
+    }
+    sparse_hess.makeCompressed();
+    spdlog::info("\nsparse matrix : #non-zero blocks = {}", cset.size());
+    // cout << sparse_hess;
 }

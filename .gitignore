@@ -42,3 +42,4 @@ src/x64/
 src/Cmake/
 *.pdb
 *.zip
+build2/

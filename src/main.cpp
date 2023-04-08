@@ -341,8 +341,10 @@ int main()
     }
     globals.body = new RigidBody(n_vertices, vertices);
 
+#define CUBE_CASE
 #ifdef CUBE_CASE
-    shayMesh body2("../src/assets/cube.obj");
+    // shayMesh body2("../src/assets/cube.obj");
+    shayMesh body2("../src/assets/bar.obj");
 
     vector<Edge> edges;
     // extract_edges(edges, body.meshes[0].indices);

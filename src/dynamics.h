@@ -2,6 +2,7 @@
 #include <Eigen/Eigen>
 #include <vector>
 #include <array>
+#include <map>
 
 using namespace std;
 using namespace Eigen;
@@ -81,5 +82,10 @@ struct MassSpringMesh
 void implicit_euler();
 void init();
 void extract_edges(vector<Edge> &edges, const vector<unsigned> indices);
-
-
+void gen_empty_sm(
+    int n_mass,
+    // vector<array<int, 4>>& idx,
+    // vector<array<int, 4>>& eidx,
+    std::vector<Edge> &edges,
+    Eigen::SparseMatrix<double> &sparse_hess,
+    std::map<std::array<int, 2>, int> &lut);
