@@ -2,6 +2,8 @@
 #include <spdlog/spdlog.h>
 #include <assert.h>
 #include <iostream>
+#include <set>
+
 mat3 RigidBody::compute_K(const vec3 &r, int t)
 {
     auto &R{S[t].R};
@@ -113,6 +115,7 @@ void compute_force(VectorXd &b, const VectorXd &v_plus)
     // b += dt * f(x + dt * v_plus)
     auto &xs{globals.mesh->mass_x};
     static const vec3 gravity{0.0, -9.8, 0.0};
+    auto &is_static{globals.mesh->is_static};
     for (auto &e : globals.mesh->edges)
     {
         int i = e.i, j = e.j;
@@ -125,31 +128,34 @@ void compute_force(VectorXd &b, const VectorXd &v_plus)
         {
             // cout << fi.transpose() << "\n";
         }
-        b.segment<3>(3 * i) += fi * dt;
-        b.segment<3>(3 * j) -= fi * dt;
+        if (!is_static[i])
+            b.segment<3>(3 * i) += fi * dt;
+        if (!is_static[j])
+            b.segment<3>(3 * j) -= fi * dt;
     }
     int n_mass = globals.mesh->mass_x.size();
 
     for (int i = 0; i < n_mass; i++)
-    {
-        b.segment<3>(i * 3) += M * gravity * dt;
+        if (!is_static[i])
+        {
+            b.segment<3>(i * 3) += M * gravity * dt;
 
-        // vec3 vi{v_plus.segment<3>(i * 3)};
-        // vec3 xi{xs[i] + vi * dt};
-        // vec3 dv{0.0, 0.0, 0.0};
-        // vec3 dx{0.0, 0.0, 0.0};
-        // for (int k = 0; k < 3; k++)
-        //     if (abs(xi(k)) > bound && vi(k) * xi(k) > 0.0)
-        //     {
-        //         dv(k) += -vi(k) * (1.0 + eps);
+            // vec3 vi{v_plus.segment<3>(i * 3)};
+            // vec3 xi{xs[i] + vi * dt};
+            // vec3 dv{0.0, 0.0, 0.0};
+            // vec3 dx{0.0, 0.0, 0.0};
+            // for (int k = 0; k < 3; k++)
+            //     if (abs(xi(k)) > bound && vi(k) * xi(k) > 0.0)
+            //     {
+            //         dv(k) += -vi(k) * (1.0 + eps);
 
-        //         // if (xi(k) > 0.0)
-        //         //     dx(k) += bound - xi(k);
-        //         // else
-        //         //     dx(k) += -bound - xi(k);
-        //     }
-        // b.segment<3>(i * 3) += M * dv;
-    }
+            //         // if (xi(k) > 0.0)
+            //         //     dx(k) += bound - xi(k);
+            //         // else
+            //         //     dx(k) += -bound - xi(k);
+            //     }
+            // b.segment<3>(i * 3) += M * dv;
+        }
 }
 void compute_b(VectorXd &b, const VectorXd &v_plus)
 /****************************************
@@ -157,13 +163,14 @@ b = M * v_t + dt * f(x_t + v_t+1 * dt)
 ****************************************/
 {
     auto &vs{globals.mesh->mass_v}, &xs{globals.mesh->mass_x};
-
+    auto &is_static{globals.mesh->is_static};
     int n_mass = vs.size();
     b.setZero(3 * n_mass);
     for (int i = 0; i < n_mass; i++)
-    {
-        b.segment<3>(i * 3) = M * vs[i];
-    }
+        if (!is_static[i])
+        {
+            b.segment<3>(i * 3) = M * vs[i];
+        }
     compute_force(b, v_plus);
 
     // cout << b.transpose() << "\n";
@@ -223,6 +230,7 @@ void compute_A(SparseMatrix<double> &sparse_matrix, const VectorXd &v_n, bool us
     auto &xs{globals.mesh->mass_x};
     int n_mass = globals.mesh->mass_x.size();
     auto &vs{globals.mesh->mass_v};
+    auto &is_static{globals.mesh->is_static};
 #define FANCY
 
 #ifdef FANCY
@@ -239,7 +247,7 @@ void compute_A(SparseMatrix<double> &sparse_matrix, const VectorXd &v_n, bool us
         int _stride = stride(k, outers);
         for (int i = 0; i < 3; i++)
         {
-            values[offset + _stride * i + i] = M;
+            values[offset + _stride * i + i] = is_static[k] ? 1.0 : M;
         }
     }
 #endif
@@ -262,11 +270,18 @@ void compute_A(SparseMatrix<double> &sparse_matrix, const VectorXd &v_n, bool us
         int ii = e.i, jj = e.j;
         auto stride_j = stride(jj, outers), stride_i = stride(ii, outers);
         auto oii = starting_offset(ii, ii, lut, outers), ojj = starting_offset(jj, jj, lut, outers), oij = starting_offset(ii, jj, lut, outers), oji = starting_offset(jj, ii, lut, outers);
-
-        put(values, oii, stride_i, K * h2_neg);
-        put(values, oij, stride_j, -K * h2_neg);
-        put(values, oji, stride_i, -K * h2_neg);
-        put(values, ojj, stride_j, K * h2_neg);
+        if (!is_static[ii])
+        {
+            put(values, oii, stride_i, K * h2_neg);
+            if (!is_static[jj])
+                put(values, oji, stride_i, -K * h2_neg);
+        }
+        if (!is_static[jj])
+        {
+            if (!is_static[ii])
+                put(values, oij, stride_j, -K * h2_neg);
+            put(values, ojj, stride_j, K * h2_neg);
+        }
 #endif
 #ifdef NO_FANCY
         for (int i = 0; i < 3; i++)
@@ -316,7 +331,7 @@ void init()
 }
 
 static const double tol = 1e-4;
-static const int max_iters = 100;
+static const int max_iters = 1;
 
 VectorXd cat(const vector<vec3> &v)
 {
@@ -396,7 +411,6 @@ void implicit_euler()
     }
 }
 
-#include <set>
 void extract_edges(vector<Edge> &edges, const vector<unsigned> indices)
 {
     set<array<unsigned, 2>> e;
@@ -471,6 +485,6 @@ void gen_empty_sm(
         }
     }
     sparse_hess.makeCompressed();
-    spdlog::info("\nsparse matrix : #non-zero blocks = {}", cset.size());
+    // spdlog::info("\nsparse matrix : #non-zero blocks = {}", cset.size());
     // cout << sparse_hess;
 }

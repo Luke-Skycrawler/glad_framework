@@ -359,7 +359,12 @@ int main()
         position[i] = vec3(p[0], p[1], p[2]);
         velocity[i] = vec3(0.0, 0.0, 0.0);
     }
-    globals.mesh = new MassSpringMesh{velocity, position, edges};
+    vector<bool> is_static;
+    is_static.resize(vert.size());
+    for (int i = 0; i < vert.size(); i ++) {
+        is_static[i] = position[i][0] == 0.0;
+    }
+    globals.mesh = new MassSpringMesh{velocity, position, edges, is_static};
 #else
     vector<vec3> xcs, vcs;
     auto bar_indices = bar_geometry(xcs);

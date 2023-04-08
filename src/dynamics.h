@@ -72,6 +72,7 @@ struct MassSpringMesh
     vector<vec3> mass_v;
     vector<vec3> mass_x;
     vector<Edge> edges;
+    vector<bool> is_static;
 };
 // void compute_b(VectorXd &b, const VectorXd &v_plus);
 // // M * v_t + dt * f(x_t + v_t+1 * dt)
