@@ -60,7 +60,7 @@ struct RigidBody
     void step(int ts);
 };
 
-static double kd = 1e-2, ks = 1e3;
+static double kd = 1e-2, ks = 1e6;
 
 struct Edge
 {

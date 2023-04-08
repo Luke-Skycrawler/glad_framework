@@ -169,7 +169,7 @@ b = M * v_t + dt * f(x_t + v_t+1 * dt)
     for (int i = 0; i < n_mass; i++)
         if (!is_static[i])
         {
-            b.segment<3>(i * 3) = M * vs[i];
+            b.segment<3>(i * 3) = M * (vs[i] - v_plus.segment<3>(i * 3));
         }
     compute_force(b, v_plus);
 
@@ -331,7 +331,7 @@ void init()
 }
 
 static const double tol = 1e-4;
-static const int max_iters = 1;
+static const int max_iters = 100;
 
 VectorXd cat(const vector<vec3> &v)
 {
@@ -368,10 +368,10 @@ void implicit_euler()
         compute_A(sparse_matrix, v_plus, iter == 0);
         SimplicialLDLT<SparseMatrix<double>> ldlt_solver;
         ldlt_solver.compute(sparse_matrix);
-        v_plus = ldlt_solver.solve(b);
+        auto dv = ldlt_solver.solve(b);
         double residue;
         {
-
+            v_plus += dv;
             VectorXd f = M * (cat(vs) - v_plus);
             compute_force(f, v_plus);
             // f += dt * f(x + dt * v_plus)
