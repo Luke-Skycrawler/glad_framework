@@ -3,111 +3,9 @@
 #include <assert.h>
 #include <iostream>
 #include <set>
-
-mat3 RigidBody::compute_K(const vec3 &r, int t)
-{
-    auto &R{S[t].R};
-    mat3 Rr{skew(R * r)};
-    mat3 J_inv{R * J0.inverse() * R.transpose()};
-    return M_inv * mat3::Identity(3, 3) - Rr * J_inv * Rr;
-}
-
-StateVector RigidBody::dSdt(const vec3 &f, int t)
-{
-    auto &R{S[t].R};
-    auto &pdot = f;
-    auto &xdot = M_inv * S[t].p;
-    auto &Rdot = skew(R * J0.inverse() * R.transpose() * S[t].L) * R;
-    vec3 Ldot(0.0, 0.0, 0.0);
-    return {xdot, pdot, Ldot, Rdot};
-}
-
-void RigidBody::step(int ts)
-{
-    auto Sdot = dSdt(vec3(0.0, 0.0, 0.0), 0);
-
-    S[1] = S[0] + Sdot * dt;
-    for (int i = 0; i < 6; i++)
-        col_set[i].resize(0);
-    auto R = S[1].R;
-
-    for (int i = 0; i < n_vertices; i++)
-    {
-        vec3 &r{vertices[i]}, xi{R * r + S[1].x};
-        for (int k = 0; k < 3; k++)
-        {
-            if (xi(k) > bound)
-                col_set[k * 2].push_back(i);
-            else if (xi(k) < -bound)
-                col_set[k * 2 + 1].push_back(i);
-        }
-        for (int i = 0; i < 6; i++)
-            if (col_set[i].size())
-                spdlog::info("collsiion set {} size = {}", i, col_set[i].size());
-
-        vec3 dp(0.0, 0.0, 0.0), dL(0.0, 0.0, 0.0), dx(0.0, 0.0, 0.0);
-        int tot = 0;
-        for (int i = 0; i < 6; i++)
-        {
-            tot += col_set[i].size();
-            vec3 r(0.0, 0.0, 0.0);
-            for (int I : col_set[i])
-            {
-                vec3 &rr{vertices[I]};
-                r += rr;
-            }
-            if (col_set[i].size())
-            {
-                r /= col_set[i].size();
-                // vec3 r{vertices[I]};
-                vec3 Rr{R * r},
-                    xi{R * r + S[1].x};
-                auto K = compute_K(r, 1);
-
-                vec3 omega = R * J0.inverse() * R.transpose() * S[1].L;
-                vec3 vi = M_inv * S[1].p + skew(omega) * Rr;
-
-                vec3 dv(0.0, 0.0, 0.0);
-
-                // for (int k = 0; k < 3; k++) {
-                int k = i / 2;
-                if (abs(xi(k)) > bound)
-                {
-                    dv(k) += -vi(k) * (1.0 + eps);
-                    if (xi(k) > 0.0)
-                        dx(k) += bound - xi(k);
-                    else
-                        dx(k) += -bound - xi(k);
-                }
-                // }
-                vec3 deltap = K.inverse() * dv;
-                dp += deltap;
-                dL += skew(Rr) * deltap;
-
-                vec3 omega1 = R * J0.inverse() * R.transpose() * (S[1].L + dL);
-                vec3 vi1 = M_inv * (S[1].p + dp) + skew(omega1) * Rr;
-
-                if (dv(k) != 0.0)
-                {
-                    spdlog::info("dim = {}, vi0 = {:.6f}, vi1 = {:.6f}", k, vi(k), vi1(k));
-                }
-            }
-        }
-        if (tot)
-        {
-            spdlog::info("ts = {}", ts);
-        }
-
-        S[1].p += dp;
-        S[1].L += dL;
-        S[0] = S[1];
-        S[0].x += dx;
-    }
-}
-
 #include "globals.h"
-extern Globals globals;
 
+extern Globals globals;
 static const double M = 1.0;
 
 void compute_force(VectorXd &b, const VectorXd &v_plus)
@@ -116,6 +14,8 @@ void compute_force(VectorXd &b, const VectorXd &v_plus)
     auto &xs{globals.mesh->mass_x};
     static const vec3 gravity{0.0, -9.8, 0.0};
     auto &is_static{globals.mesh->is_static};
+    int n_mass = globals.mesh->mass_x.size();
+
     for (auto &e : globals.mesh->edges)
     {
         int i = e.i, j = e.j;
@@ -123,7 +23,7 @@ void compute_force(VectorXd &b, const VectorXd &v_plus)
         xji += (v_plus.segment<3>(3 * j) - v_plus.segment<3>(3 * i)) * dt;
 
         assert(xji.squaredNorm() > 0.0);
-        vec3 fi = ks * (xji - e.l0 * (xji).normalized());
+        vec3 fi = globals.config["ks"] * (xji - e.l0 * (xji).normalized());
         if (fi.squaredNorm() > 0.01)
         {
             // cout << fi.transpose() << "\n";
@@ -133,8 +33,7 @@ void compute_force(VectorXd &b, const VectorXd &v_plus)
         if (!is_static[j])
             b.segment<3>(3 * j) -= fi * dt;
     }
-    int n_mass = globals.mesh->mass_x.size();
-
+    if (globals.config["gravity"])
     for (int i = 0; i < n_mass; i++)
         if (!is_static[i])
         {
@@ -145,14 +44,14 @@ void compute_force(VectorXd &b, const VectorXd &v_plus)
             // vec3 dv{0.0, 0.0, 0.0};
             // vec3 dx{0.0, 0.0, 0.0};
             // for (int k = 0; k < 3; k++)
-            //     if (abs(xi(k)) > bound && vi(k) * xi(k) > 0.0)
+            //     if (abs(xi(k)) > globals.config["bound"] && vi(k) * xi(k) > 0.0)
             //     {
             //         dv(k) += -vi(k) * (1.0 + eps);
 
             //         // if (xi(k) > 0.0)
-            //         //     dx(k) += bound - xi(k);
+            //         //     dx(k) += globals.config["bound"] - xi(k);
             //         // else
-            //         //     dx(k) += -bound - xi(k);
+            //         //     dx(k) += -globals.config["bound"] - xi(k);
             //     }
             // b.segment<3>(i * 3) += M * dv;
         }
@@ -196,7 +95,7 @@ mat3 compute_single_spring_K(Edge &e, const vec3 &vi, const vec3 &vj, bool use_v
     double l2 = xji.squaredNorm();
     double l = sqrt(l2);
     mat3 term1 = mat3::Identity(3, 3) - K / l2;
-    mat3 K_spring = ks * (-mat3::Identity(3, 3) + (e.l0 / l) * term1);
+    mat3 K_spring = globals.config["ks"] * (-mat3::Identity(3, 3) + (e.l0 / l) * term1);
     // mat3 K_damp = -(kd / l) * vji.transpose() * term1;
     return K_spring;
     // return K_spring + K_damp;
@@ -301,14 +200,14 @@ void compute_A(SparseMatrix<double> &sparse_matrix, const VectorXd &v_n, bool us
     //     vec3 dv{0.0, 0.0, 0.0};
     //     vec3 dx{0.0, 0.0, 0.0};
     //     for (int k = 0; k < 3; k++)
-    //         if (abs(xi(k)) > bound && vi(k) * xi(k) > 0.0)
+    //         if (abs(xi(k)) > globals.config["bound"] && vi(k) * xi(k) > 0.0)
     //         {
     //             dv(k) += -vi(k) * (1.0 + eps);
     //             sparse_matrix.coeffRef(k + i * 3, k + i * 3) += - M * (1.0 + eps) / dt;
     //             // if (xi(k) > 0.0)
-    //             //     dx(k) += bound - xi(k);
+    //             //     dx(k) += globals.config["bound"] - xi(k);
     //             // else
-    //             //     dx(k) += -bound - xi(k);
+    //             //     dx(k) += -globals.config["bound"] - xi(k);
     //         }
     // }
 }
@@ -330,8 +229,6 @@ void init()
     // globals.mesh->mass_x[0] += vec3{0.0, 0.0, 0.3};
 }
 
-static const double tol = 1e-4;
-static const int max_iters = 100;
 
 VectorXd cat(const vector<vec3> &v)
 {
@@ -377,10 +274,10 @@ void implicit_euler()
             // f += dt * f(x + dt * v_plus)
             residue = f.norm();
         }
-        bool term_cond = residue < tol;
+        bool term_cond = residue < globals.config["tol"];
         if (term_cond)
             break;
-        if (++iter >= max_iters)
+        if (++iter >= globals.config["max_iters"])
             break;
     } while (true);
     cout << "iter = " << iter << ", norm v = " << v_plus.norm() << "\n";
@@ -395,14 +292,14 @@ void implicit_euler()
         vec3 dv{0.0, 0.0, 0.0};
         vec3 dx{0.0, 0.0, 0.0};
         for (int k = 0; k < 3; k++)
-            if (abs(xi(k)) > bound && vi(k) * xi(k) > 0.0)
+            if (abs(xi(k)) > globals.config["bound"] && vi(k) * xi(k) > 0.0)
             {
                 dv(k) += -vi(k) * (1.0 + eps);
 
                 if (xi(k) > 0.0)
-                    dx(k) += bound - xi(k);
+                    dx(k) += globals.config["bound"] - xi(k);
                 else
-                    dx(k) += -bound - xi(k);
+                    dx(k) += -globals.config["bound"] - xi(k);
             }
         // b.segment<3>(i * 3) += M * dv;
         vs[i] += dv;
@@ -413,7 +310,8 @@ void implicit_euler()
 
 void extract_edges(vector<Edge> &edges, const vector<unsigned> indices)
 {
-    set<array<unsigned, 2>> e;
+    static set<array<unsigned, 2>> e;
+    e.clear();
     edges.resize(0);
     static const auto insert = [&](unsigned a, unsigned b)
     {

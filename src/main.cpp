@@ -39,10 +39,9 @@ bool concentric = true, implicit = false;
 #include <sstream>
 #include <string>
 #include <vector>
-vector<unsigned> bar_geometry(vector<vec3>& xcs);
-
-    vector<Eigen::Vector3f> read_obj(const string &filename,
-                                     vector<unsigned> &indices)
+vector<unsigned> bar_geometry(vector<vec3> &xcs);
+vector<Eigen::Vector3f> read_obj(const string &filename,
+                                 vector<unsigned> &indices)
 {
     vector<Eigen::Vector3f> vertices;
     ifstream infile(filename);
@@ -82,86 +81,76 @@ vector<unsigned> bar_geometry(vector<vec3>& xcs);
     }
     return vertices;
 }
-
-struct shayMesh
+shayMesh::shayMesh(const string &filename)
 {
+    vertices = read_obj(filename, indices);
+    nv = vertices.size();
+    nf = indices.size() / 3;
+    setupMesh();
+}
 
-    vector<Vector3f> vertices;
-    vector<unsigned> indices;
-    int nv, nf;
-    shayMesh(const string &filename)
+shayMesh::shayMesh(const vector<vec3> &xcs, const vector<unsigned> &indices)
+{
+    nv = xcs.size();
+    nf = indices.size() / 3;
+    vertices.resize(nv);
+    for (int i = 0; i < nv; i++)
     {
+        vertices[i] = Vector3f(xcs[i][0], xcs[i][1], xcs[i][2]);
+    }
+    this->indices = indices;
+    setupMesh();
+}
 
-        vertices = read_obj(filename, indices);
-        nv = vertices.size();
-        nf = indices.size() / 3;
-        setupMesh();
+void shayMesh::setupMesh()
+{
+    // create buffers/arrays
+    glGenVertexArrays(1, &vao);
+    glGenBuffers(1, &vbo);
+    glGenBuffers(1, &ebo);
+
+    glBindVertexArray(vao);
+    // load data into vertex buffers
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    // A great thing about structs is that their memory layout is sequential for all its items.
+    // The effect is that we can simply pass a pointer to the struct and it translates perfectly to a glm::vec3/2 array which
+    // again translates to 3/2 floats which translates to a byte array.
+    glBufferData(GL_ARRAY_BUFFER, nv * sizeof(Vector3f), vertices.data(), GL_DYNAMIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, nf * sizeof(int) * 3, indices.data(), GL_DYNAMIC_DRAW);
+
+    // set the vertex attribute pointers
+    // vertex Positions
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vector3f), (void *)0);
     }
 
-    shayMesh(const vector<vec3> &xcs, const vector<unsigned> &indices)
-    {
-        nv = xcs.size();
-        nf = indices.size() / 3;
-        vertices.resize(nv);
-        for (int i = 0; i < nv; i++)
-        {
-            vertices[i] = Vector3f(xcs[i][0], xcs[i][1], xcs[i][2]);
-        }
-        this->indices = indices;
-        setupMesh();
-    }
-
-    unsigned vao, vbo, ebo;
-    void setupMesh()
-    {
-        // create buffers/arrays
-        glGenVertexArrays(1, &vao);
-        glGenBuffers(1, &vbo);
-        glGenBuffers(1, &ebo);
-
-        glBindVertexArray(vao);
-        // load data into vertex buffers
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        // A great thing about structs is that their memory layout is sequential for all its items.
-        // The effect is that we can simply pass a pointer to the struct and it translates perfectly to a glm::vec3/2 array which
-        // again translates to 3/2 floats which translates to a byte array.
-        glBufferData(GL_ARRAY_BUFFER, nv * sizeof(Vector3f), vertices.data(), GL_DYNAMIC_DRAW);
-
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, nf * sizeof(int) * 3, indices.data(), GL_DYNAMIC_DRAW);
-
-        // set the vertex attribute pointers
-        // vertex Positions
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vector3f), (void *)0);
-    }
-
-    void draw()
+    void shayMesh::draw()
     {
         glBindVertexArray(vao);
         glDrawElements(GL_TRIANGLES, nf * 3, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
     }
 
-    void update_positions()
-    {
-        glBindVertexArray(vao);
-        // load data into vertex buffers
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        // A great thing about structs is that their memory layout is sequential for all its items.
-        // The effect is that we can simply pass a pointer to the struct and it translates perfectly to a glm::vec3/2 array which
-        // again translates to 3/2 floats which translates to a byte array.
-        glBufferData(GL_ARRAY_BUFFER, nv * sizeof(Vector3f), vertices.data(), GL_DYNAMIC_DRAW);
+void shayMesh::update_positions()
+{
+    glBindVertexArray(vao);
+    // load data into vertex buffers
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    // A great thing about structs is that their memory layout is sequential for all its items.
+    // The effect is that we can simply pass a pointer to the struct and it translates perfectly to a glm::vec3/2 array which
+    // again translates to 3/2 floats which translates to a byte array.
+    glBufferData(GL_ARRAY_BUFFER, nv * sizeof(Vector3f), vertices.data(), GL_DYNAMIC_DRAW);
 
-        // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        // glBufferData(GL_ELEMENT_ARRAY_BUFFER, nf * sizeof(int) * 3, indices.data(), GL_STATIC_DRAW);
+    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    // glBufferData(GL_ELEMENT_ARRAY_BUFFER, nf * sizeof(int) * 3, indices.data(), GL_STATIC_DRAW);
 
-        // set the vertex attribute pointers
-        // vertex Positions
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vector3f), (void *)0);
-    }
-};
+    // set the vertex attribute pointers
+    // vertex Positions
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vector3f), (void *)0);
+}
 
 // lighting
 glm::vec3 LightPositions[]={
@@ -215,6 +204,53 @@ void processInput(GLFWwindow* window)
     // }
     // else globals.body.f = glm::vec2(0.0);
 }
+void reset_globals()
+{
+    std::ifstream f("../src/config.json");
+    globals.config = json::parse(f);
+
+#define CUBE_CASE
+#ifdef CUBE_CASE
+    // shayMesh rendered_mesh("../src/assets/cube.obj");
+    auto body2_ptr = new shayMesh("../src/assets/bar.obj");
+    shayMesh &rendered_mesh = *body2_ptr;
+    auto &vertices{rendered_mesh.vertices};
+
+    vector<Edge> edges;
+    // extract_edges(edges, body.meshes[0].indices);
+    extract_edges(edges, rendered_mesh.indices);
+    vector<vec3> velocity, position;
+    vector<bool> is_static;
+
+    velocity.resize(vertices.size());
+    position.resize(vertices.size());
+    is_static.resize(vertices.size());
+
+    for (int i = 0; i < vertices.size(); i++)
+    {
+        auto &p{vertices[i]};
+        position[i] = vec3(p[0], p[1], p[2]);
+        velocity[i] = vec3(0.0, 0.0, 0.0);
+        if (globals.config["static"])
+        is_static[i] = position[i][0] == 0.0;
+        else is_static[i] = false;
+    }
+    globals.mesh = new MassSpringMesh{velocity, position, edges, is_static};
+#else
+    vector<vec3> xcs, vcs;
+    auto bar_indices = bar_geometry(xcs);
+    vector<Edge> bar_edges;
+    extract_edges(bar_edges, bar_indices);
+    shayMesh rendered_mesh(xcs, bar_indices);
+    for (int i = 0; i < xcs.size(); i++)
+        vcs[i] = vec3(0.0, 0.0, 0.0);
+    globals.mesh = new MassSpringMesh{vcs, xcs, bar_edges};
+    auto &vertices{rendered_mesh.vertices};
+#endif
+    init();
+    globals.rendered_mesh = body2_ptr;
+}
+
 int main()
 {
     // glfw: initialize and configure
@@ -326,58 +362,7 @@ int main()
     glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,4*sizeof(float),(void*)(2*sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    // load models
-    // Model body("../src/assets/dragon_8kface.obj");
-    // Model body("../src/assets/cube.obj");
-    Model body("../src/assets/tri.obj");
-
-
-    auto& vs{ body.meshes[0].vertices };
-    int n_vertices = vs.size();
-    vec3* vertices = new vec3[n_vertices];
-    for (int i = 0; i < n_vertices; i++) {
-        auto &p {vs[i].Position};
-        vertices[i] = vec3(p[0], p[1], p[2]);
-    }
-    globals.body = new RigidBody(n_vertices, vertices);
-
-#define CUBE_CASE
-#ifdef CUBE_CASE
-    // shayMesh body2("../src/assets/cube.obj");
-    shayMesh body2("../src/assets/bar.obj");
-
-    vector<Edge> edges;
-    // extract_edges(edges, body.meshes[0].indices);
-    extract_edges(edges, body2.indices);
-    vector<vec3> velocity, position;
-    auto &vert{body2.vertices};
-    velocity.resize(vert.size());
-    position.resize(vert.size());
-    for (int i = 0; i < vert.size(); i++)
-    {
-        auto &p{vert[i]};
-        position[i] = vec3(p[0], p[1], p[2]);
-        velocity[i] = vec3(0.0, 0.0, 0.0);
-    }
-    vector<bool> is_static;
-    is_static.resize(vert.size());
-    for (int i = 0; i < vert.size(); i ++) {
-        is_static[i] = position[i][0] == 0.0;
-    }
-    globals.mesh = new MassSpringMesh{velocity, position, edges, is_static};
-#else
-    vector<vec3> xcs, vcs;
-    auto bar_indices = bar_geometry(xcs);
-    vector<Edge> bar_edges;
-    extract_edges(bar_edges, bar_indices);
-    shayMesh body2(xcs, bar_indices);
-    for (int i = 0; i < xcs.size(); i++)
-        vcs[i] = vec3(0.0, 0.0, 0.0);
-    globals.mesh = new MassSpringMesh{vcs, xcs, bar_edges};
-    auto &vert {body2.vertices};
-#endif
-    init();
-
+    reset_globals();
     Light lights(LightPositions, 4);
     // load textures (we now use a utility function to keep the code more organized)
     // ------------------------------------------------------------------
@@ -427,15 +412,14 @@ int main()
         // lightingShader.setFloat("time",currentFrame);
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
-        // globals.body->step(ts++);
         implicit_euler();
-        for (int i = 0; i < vert.size(); i++)
+        auto &vertices{globals.rendered_mesh->vertices};
+        for (int i = 0; i < vertices.size(); i++)
         {
             auto &p{globals.mesh->mass_x[i]};
-            vert[i] = Vector3f(p[0], p[1], p[2]);
+            vertices[i] = Vector3f(p[0], p[1], p[2]);
         }
-        body.meshes[0].update_data();
-        body2.update_positions();
+        globals.rendered_mesh->update_positions();
         // input
         processInput(window);
         // render setup
@@ -489,19 +473,14 @@ int main()
             renderPlane();
             shader.setMat4("model", glm::translate(model, glm::vec3(0.0f, 0.0f,-boundf)));
             renderPlane();
-            
 
-            glm::mat4 A(from_eigen(globals.body->S[0].R));
-            for (int i = 0; i < 3; i++)
-                A[3][i] = globals.body->S[0].x(i);
-            A[3][3] = 1.0;
-            shader.setMat4("model", A);
+            shader.setMat4("model", glm::mat4(1.0f));
             //model = glm::translate(model, from_eigen(globals.body ->S[0].x));
             //shader.setMat4("model", model);
             shader.setVec3("objectColor", 1.0f, 1.0f, 1.0f);
 
             // body.Draw(shader);
-            body2.draw();
+            globals.rendered_mesh->draw();
         };
         if(display_corner){
             glBindFramebuffer(GL_FRAMEBUFFER,depthMapFBO);
@@ -646,6 +625,9 @@ void char_callback(GLFWwindow* window, unsigned int codepoint)
 
     if (codepoint == 'r')
     {
+        delete globals.mesh;
+        delete globals.rendered_mesh;
+        reset_globals();
         // init();
     }
 }

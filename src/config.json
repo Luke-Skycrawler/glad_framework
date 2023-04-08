@@ -1,0 +1,9 @@
+{
+    "ks": 1e6,
+    "bound": 1.0,
+    "static": true,
+    "gravity": true,
+    "ground": true,
+    "tol": 1e-4,
+    "max_iters": 100
+}
