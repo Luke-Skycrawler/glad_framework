@@ -1,9 +1,9 @@
 {
-    "ks": 1e6,
+    "ks": 1e5,
     "bound": 1.0,
     "static": true,
     "gravity": true,
-    "ground": true,
+    "collision": false,
     "tol": 1e-4,
-    "max_iters": 100
+    "max_iters": 1
 }

@@ -38,23 +38,25 @@ void compute_force(VectorXd &b, const VectorXd &v_plus)
         if (!is_static[i])
         {
             b.segment<3>(i * 3) += M * gravity * dt;
-
-            // vec3 vi{v_plus.segment<3>(i * 3)};
-            // vec3 xi{xs[i] + vi * dt};
-            // vec3 dv{0.0, 0.0, 0.0};
-            // vec3 dx{0.0, 0.0, 0.0};
-            // for (int k = 0; k < 3; k++)
-            //     if (abs(xi(k)) > globals.config["bound"] && vi(k) * xi(k) > 0.0)
-            //     {
-            //         dv(k) += -vi(k) * (1.0 + eps);
-
-            //         // if (xi(k) > 0.0)
-            //         //     dx(k) += globals.config["bound"] - xi(k);
-            //         // else
-            //         //     dx(k) += -globals.config["bound"] - xi(k);
-            //     }
-            // b.segment<3>(i * 3) += M * dv;
         }
+    if (globals.config["collision"])
+    for (int i = 0; i < n_mass; i++)
+    {
+        vec3 vi{v_plus.segment<3>(i * 3)};
+        vec3 xi{xs[i] + vi * dt};
+        vec3 dv{0.0, 0.0, 0.0};
+        vec3 dx{0.0, 0.0, 0.0};
+        for (int k = 0; k < 3; k++)
+            if (abs(xi(k)) > globals.config["bound"] && vi(k) * xi(k) > 0.0)
+            {
+                dv(k) += -vi(k) * (1.0 + eps);
+                // if (xi(k) > 0.0)
+                //     dx(k) += globals.config["bound"] - xi(k);
+                // else
+                //     dx(k) += -globals.config["bound"] - xi(k);
+            }
+        b.segment<3>(i * 3) += M * dv;
+    }
 }
 void compute_b(VectorXd &b, const VectorXd &v_plus)
 /****************************************
@@ -97,6 +99,10 @@ mat3 compute_single_spring_K(Edge &e, const vec3 &vi, const vec3 &vj, bool use_v
     mat3 term1 = mat3::Identity(3, 3) - K / l2;
     mat3 K_spring = globals.config["ks"] * (-mat3::Identity(3, 3) + (e.l0 / l) * term1);
     // mat3 K_damp = -(kd / l) * vji.transpose() * term1;
+    if (l < e.l0) {
+        auto xji_normalized = xji.normalized();
+        K_spring = -xji_normalized * xji_normalized.transpose() * globals.config["ks"];
+    }
     return K_spring;
     // return K_spring + K_damp;
 }
@@ -123,9 +129,9 @@ void put(double *values, int offset, int _stride, const mat3 &block)
         }
 }
 
-void compute_A(SparseMatrix<double> &sparse_matrix, const VectorXd &v_n, bool use_v_t = true)
+void compute_A(SparseMatrix<double> &sparse_matrix, const map<array<int, 2>, int> &lut, const VectorXd &v_n, bool use_v_t = true)
 {
-    sparse_matrix.setZero();
+    // sparse_matrix.setZero();
     auto &xs{globals.mesh->mass_x};
     int n_mass = globals.mesh->mass_x.size();
     auto &vs{globals.mesh->mass_v};
@@ -134,12 +140,14 @@ void compute_A(SparseMatrix<double> &sparse_matrix, const VectorXd &v_n, bool us
 
 #ifdef FANCY
 
-    // TODO:  move this to initialization
-    map<array<int, 2>, int> lut;
-    gen_empty_sm(n_mass, globals.mesh->edges, sparse_matrix, lut);
-
     auto outers = sparse_matrix.outerIndexPtr();
     auto values = sparse_matrix.valuePtr();
+
+    int n_entries = sparse_matrix.nonZeros();
+    for (int i = 0; i < n_entries; i++)
+    {
+        values[i] = 0.0;
+    }
     for (int k = 0; k < n_mass; k++)
     {
         int offset = starting_offset(k, k, lut, outers);
@@ -173,12 +181,12 @@ void compute_A(SparseMatrix<double> &sparse_matrix, const VectorXd &v_n, bool us
         {
             put(values, oii, stride_i, K * h2_neg);
             if (!is_static[jj])
-                put(values, oji, stride_i, -K * h2_neg);
+            put(values, oji, stride_i, -K * h2_neg);
         }
         if (!is_static[jj])
         {
             if (!is_static[ii])
-                put(values, oij, stride_j, -K * h2_neg);
+            put(values, oij, stride_j, -K * h2_neg);
             put(values, ojj, stride_j, K * h2_neg);
         }
 #endif
@@ -186,30 +194,35 @@ void compute_A(SparseMatrix<double> &sparse_matrix, const VectorXd &v_n, bool us
         for (int i = 0; i < 3; i++)
             for (int j = 0; j < 3; j++)
             {
-                sparse_matrix.coeffRef(i + I, j + I) += K(i, j) * h2_neg;
-                sparse_matrix.coeffRef(i + I, j + J) += -K(i, j) * h2_neg;
-                sparse_matrix.coeffRef(i + J, j + I) += -K(i, j) * h2_neg;
-                sparse_matrix.coeffRef(i + J, j + J) += K(i, j) * h2_neg;
+            sparse_matrix.coeffRef(i + I, j + I) += K(i, j) * h2_neg;
+            sparse_matrix.coeffRef(i + I, j + J) += -K(i, j) * h2_neg;
+            sparse_matrix.coeffRef(i + J, j + I) += -K(i, j) * h2_neg;
+            sparse_matrix.coeffRef(i + J, j + J) += K(i, j) * h2_neg;
             }
 #endif
     }
-    // for (int i = 0; i < n_mass; i++)
-    // {
-    //     vec3 vi{v_n.segment<3>(i * 3)};
-    //     vec3 xi{xs[i] + vi * dt};
-    //     vec3 dv{0.0, 0.0, 0.0};
-    //     vec3 dx{0.0, 0.0, 0.0};
-    //     for (int k = 0; k < 3; k++)
-    //         if (abs(xi(k)) > globals.config["bound"] && vi(k) * xi(k) > 0.0)
-    //         {
-    //             dv(k) += -vi(k) * (1.0 + eps);
-    //             sparse_matrix.coeffRef(k + i * 3, k + i * 3) += - M * (1.0 + eps) / dt;
-    //             // if (xi(k) > 0.0)
-    //             //     dx(k) += globals.config["bound"] - xi(k);
-    //             // else
-    //             //     dx(k) += -globals.config["bound"] - xi(k);
-    //         }
-    // }
+    if (globals.config["collision"])
+        for (int i = 0; i < n_mass; i++)
+        {
+            vec3 vi{v_n.segment<3>(i * 3)};
+            vec3 xi{xs[i] + vi * dt};
+            vec3 dv{0.0, 0.0, 0.0};
+            vec3 dx{0.0, 0.0, 0.0};
+#ifdef FANCY
+            int offset = starting_offset(i, i, lut, outers);
+            int _stride = stride(i, outers);
+#endif
+            for (int k = 0; k < 3; k++)
+            if (abs(xi(k)) > globals.config["bound"] && vi(k) * xi(k) > 0.0)
+            {
+#ifdef FANCY
+                values[offset + _stride * k + k] += M * (1.0 + eps);
+#endif
+#ifdef NO_FANCY
+                sparse_matrix.coeffRef(k + i * 3, k + i * 3) += M * (1.0 + eps);
+#endif
+            }
+        }
 }
 
 void init_l0()
@@ -229,7 +242,6 @@ void init()
     // globals.mesh->mass_x[0] += vec3{0.0, 0.0, 0.3};
 }
 
-
 VectorXd cat(const vector<vec3> &v)
 {
     VectorXd ret;
@@ -242,7 +254,7 @@ VectorXd cat(const vector<vec3> &v)
     return ret;
 }
 
-void implicit_euler()
+void implicit_euler(SparseMatrix<double> &sparse_matrix, const map<array<int, 2>, int> &lut)
 {
 
     int n_mass = globals.mesh->mass_x.size();
@@ -251,7 +263,6 @@ void implicit_euler()
 
     int n_unknowns = n_mass * 3;
     VectorXd b, v_plus;
-    SparseMatrix<double> sparse_matrix(n_unknowns, n_unknowns);
     b.setZero(n_unknowns);
     v_plus.setZero(n_unknowns);
     int iter = 0;
@@ -262,7 +273,7 @@ void implicit_euler()
         compute_b(b, v_plus);
         // 1st iter v_plus = 0, b = M * v_t + dt * f(x_t)
 
-        compute_A(sparse_matrix, v_plus, iter == 0);
+        compute_A(sparse_matrix, lut, v_plus, iter == 0);
         SimplicialLDLT<SparseMatrix<double>> ldlt_solver;
         ldlt_solver.compute(sparse_matrix);
         auto dv = ldlt_solver.solve(b);

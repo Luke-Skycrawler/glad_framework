@@ -80,7 +80,7 @@ struct MassSpringMesh
 // void compute_force(VectorXd &b, const VectorXd &v_plus);
 // // b += dt * f(x + v * dt)
 // void init_l0();
-void implicit_euler();
+void implicit_euler(SparseMatrix<double> &sparse_matrix, const map<array<int, 2>, int> &lut);
 void init();
 void extract_edges(vector<Edge> &edges, const vector<unsigned> indices);
 void gen_empty_sm(

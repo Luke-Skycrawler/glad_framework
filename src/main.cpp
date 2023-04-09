@@ -266,7 +266,7 @@ int main()
 
     // glfw window creation
     // ------------------------------------------------------------------
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "glad framework", NULL, NULL);
+    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "glad framework", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -278,7 +278,7 @@ int main()
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
     glfwSetCharCallback(window, char_callback);
-    //glfwSetMouseButtonCallback(window, click_callback);
+    // glfwSetMouseButtonCallback(window, click_callback);
 
     // tell GLFW to capture our mouse
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -297,11 +297,11 @@ int main()
 
     // build and compile our shader programs
     // ------------------------------------------------------------------
-    //Shader lightingShader("../src/shaders/cursor/cursor.vert", "../src/shaders/cursor/cursor.frag", "../src/shaders/cursor/cursor.geom");
+    // Shader lightingShader("../src/shaders/cursor/cursor.vert", "../src/shaders/cursor/cursor.frag", "../src/shaders/cursor/cursor.geom");
     Shader lightingShader("../src/shaders/shadow/shadow.vert", "../src/shaders/shadow/shadow.frag");
-    //Shader lightingShader("../src/shaders/light/multi_light.vert", "../src/shaders/light/multi_light.frag");
-    Shader depthShader("../src/shaders/depth/depth.vert","../src/shaders/depth/depth.frag");
-    Shader cornerShader("../src/shaders/corner/corner.vert","../src/shaders/corner/corner.frag");
+    // Shader lightingShader("../src/shaders/light/multi_light.vert", "../src/shaders/light/multi_light.frag");
+    Shader depthShader("../src/shaders/depth/depth.vert", "../src/shaders/depth/depth.frag");
+    Shader cornerShader("../src/shaders/corner/corner.vert", "../src/shaders/corner/corner.frag");
     // select buffers setup
     // ------------------------------------------------------------------
     unsigned int tex, buf;
@@ -323,46 +323,50 @@ int main()
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
     unsigned int quadVBO, quadVAO;
-    float corner[]={
-         0.5f,  1.0f,  0.0f, 1.0f,
-         0.5f,  0.5f,  0.0f, 0.0f,
-         1.0f,  0.5f,  1.0f, 0.0f,
-         0.5f,  1.0f,  0.0f, 1.0f,
-         1.0f,  0.5f,  1.0f, 0.0f,
-         1.0f,  1.0f,  1.0f, 1.0f
-    };
-    float quad[]={
-        -1.0f,  1.0f,  0.0f, 1.0f,
-        -1.0f, -1.0f,  0.0f, 0.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
-        -1.0f,  1.0f,  0.0f, 1.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
-         1.0f,  1.0f,  1.0f, 1.0f
-    };
+    float corner[] = {
+        0.5f, 1.0f, 0.0f, 1.0f,
+        0.5f, 0.5f, 0.0f, 0.0f,
+        1.0f, 0.5f, 1.0f, 0.0f,
+        0.5f, 1.0f, 0.0f, 1.0f,
+        1.0f, 0.5f, 1.0f, 0.0f,
+        1.0f, 1.0f, 1.0f, 1.0f};
+    float quad[] = {
+        -1.0f, 1.0f, 0.0f, 1.0f,
+        -1.0f, -1.0f, 0.0f, 0.0f,
+        1.0f, -1.0f, 1.0f, 0.0f,
+        -1.0f, 1.0f, 0.0f, 1.0f,
+        1.0f, -1.0f, 1.0f, 0.0f,
+        1.0f, 1.0f, 1.0f, 1.0f};
     glGenVertexArrays(1, &quadVAO);
     glGenBuffers(1, &quadVBO);
-    
 
     glBindVertexArray(quadVAO);
     glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(quad), &quad, GL_STATIC_DRAW);
-    glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,4*sizeof(float),(void*)0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,4*sizeof(float),(void*)(2*sizeof(float)));
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    unsigned int cornerVAO,cornerVBO;
+    unsigned int cornerVAO, cornerVBO;
     glGenVertexArrays(1, &cornerVAO);
     glGenBuffers(1, &cornerVBO);
     glBindVertexArray(cornerVAO);
     glBindBuffer(GL_ARRAY_BUFFER, cornerVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(corner), &corner, GL_STATIC_DRAW);
-    glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,4*sizeof(float),(void*)0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,4*sizeof(float),(void*)(2*sizeof(float)));
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
     reset_globals();
+
+    // TODO:  move this to initialization
+    map<array<int, 2>, int> lut;
+    int n_mass = globals.mesh->mass_x.size();
+    SparseMatrix<double> sparse_matrix(n_mass * 3, n_mass * 3);
+    gen_empty_sm(n_mass, globals.mesh->edges, sparse_matrix, lut);
+
     Light lights(LightPositions, 4);
     // load textures (we now use a utility function to keep the code more organized)
     // ------------------------------------------------------------------
@@ -412,7 +416,7 @@ int main()
         // lightingShader.setFloat("time",currentFrame);
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
-        implicit_euler();
+        implicit_euler(sparse_matrix, lut);
         auto &vertices{globals.rendered_mesh->vertices};
         for (int i = 0; i < vertices.size(); i++)
         {
