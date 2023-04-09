@@ -11,6 +11,7 @@ static const double M = 1.0;
 void compute_force(VectorXd &b, const VectorXd &v_plus)
 {
     // b += dt * f(x + dt * v_plus)
+    double bound = globals.config["bound"];
     auto &xs{globals.mesh->mass_x};
     static const vec3 gravity{0.0, -9.8, 0.0};
     auto &is_static{globals.mesh->is_static};
@@ -46,16 +47,19 @@ void compute_force(VectorXd &b, const VectorXd &v_plus)
         vec3 xi{xs[i] + vi * dt};
         vec3 dv{0.0, 0.0, 0.0};
         vec3 dx{0.0, 0.0, 0.0};
+        vec3 cn{0.0, 0.0, 0.0};
         for (int k = 0; k < 3; k++)
-            if (abs(xi(k)) > globals.config["bound"] && vi(k) * xi(k) > 0.0)
+            if (abs(xi(k)) > bound)// && vi(k) * xi(k) > 0.0)
             {
-                dv(k) += -vi(k) * (1.0 + eps);
-                // if (xi(k) > 0.0)
-                //     dx(k) += globals.config["bound"] - xi(k);
-                // else
-                //     dx(k) += -globals.config["bound"] - xi(k);
+                // cn(k) = abs(xi(k)) - bound;
+                // dv(k) += -vi(k) * (1.0 + eps);
+                if (xi(k) > 0.0)
+                    cn(k) = bound - xi(k);
+                else
+                    cn(k) = -bound - xi(k);
             }
-        b.segment<3>(i * 3) += M * dv;
+        b.segment<3> (i * 3) += globals.config["kn"] * cn;
+        // b.segment<3>(i * 3) += M * dv;
     }
 }
 void compute_b(VectorXd &b, const VectorXd &v_plus)
@@ -213,10 +217,12 @@ void compute_A(SparseMatrix<double> &sparse_matrix, const map<array<int, 2>, int
             int _stride = stride(i, outers);
 #endif
             for (int k = 0; k < 3; k++)
-            if (abs(xi(k)) > globals.config["bound"] && vi(k) * xi(k) > 0.0)
+            if (abs(xi(k)) > globals.config["bound"])// && vi(k) * xi(k) > 0.0)
             {
+                // double cn = abs(xi(k)) - globals.config["bound"];
 #ifdef FANCY
-                values[offset + _stride * k + k] += M * (1.0 + eps);
+                values[offset + _stride * k + k] += globals.config["kn"];
+                // values[offset + _stride * k + k] += M * (1.0 + eps);
 #endif
 #ifdef NO_FANCY
                 sparse_matrix.coeffRef(k + i * 3, k + i * 3) += M * (1.0 + eps);
