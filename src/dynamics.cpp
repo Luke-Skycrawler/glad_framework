@@ -58,7 +58,7 @@ void compute_force(VectorXd &b, const VectorXd &v_plus)
                 else
                     cn(k) = -bound - xi(k);
             }
-        b.segment<3> (i * 3) += globals.config["kn"] * cn;
+        b.segment<3> (i * 3) += globals.config["kn"] * cn * dt;
         // b.segment<3>(i * 3) += M * dv;
     }
 }
@@ -221,7 +221,7 @@ void compute_A(SparseMatrix<double> &sparse_matrix, const map<array<int, 2>, int
             {
                 // double cn = abs(xi(k)) - globals.config["bound"];
 #ifdef FANCY
-                values[offset + _stride * k + k] += globals.config["kn"];
+                values[offset + _stride * k + k] += globals.config["kn"] * dt * dt;
                 // values[offset + _stride * k + k] += M * (1.0 + eps);
 #endif
 #ifdef NO_FANCY
