@@ -3,7 +3,7 @@
 #include <vector>
 #include <array>
 #include <map>
-
+#include <tuple>
 using namespace std;
 using namespace Eigen;
 using vec3 = Vector3d;
@@ -90,3 +90,4 @@ void gen_empty_sm(
     std::vector<Edge> &edges,
     Eigen::SparseMatrix<double> &sparse_hess,
     std::map<std::array<int, 2>, int> &lut);
+tuple<int, double, vec3> raytrace_triangle(const Vector2d &xm, const Matrix4d &P, const vector<vec3> &vertices, const vector<unsigned> &indices);

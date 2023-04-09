@@ -403,3 +403,66 @@ void gen_empty_sm(
     // spdlog::info("\nsparse matrix : #non-zero blocks = {}", cset.size());
     // cout << sparse_hess;
 }
+
+#include <assert.h>
+tuple<int, double, vec3> raytrace_triangle(const Vector2d &xm, const Matrix4d &P, const vector<vec3> &vertices, const vector<unsigned> &indices)
+{
+    // calculates the intersection point of a ray with a triangle
+    // returns: (triangle index, z value, barycentric coordinates)
+    int n_triangles = indices.size() / 3;
+    const auto compute_z = [](const Vector4d &v0_4d, const Vector4d &v1_4d, const Vector4d &v2_4d, const Vector2d &xm, vec3 &alpha_beta_gamma) -> double
+    {
+        // computes the z value of the intersection point
+        Vector2d xi[] = {
+            v0_4d.head<3>() - xm * v0_4d(3),
+            v1_4d.head<3>() - xm * v1_4d(3),
+            v2_4d.head<3>() - xm * v2_4d(3)};
+        double a = Matrix2d(xi[1], xi[2]).determinant();
+        double b = Matrix2d(xi[3], xi[0]).determinant();
+        double c = Matrix2d(xi[0], xi[1]).determinant();
+        mat3 A;
+        A << xi[0], 1.0, xi[1], 1.0, xi[2], 1.0;
+        alpha_beta_gamma = A.inverse() * vec3{0.0, 0.0, 1.0};
+        assert(alpha_beta_gamma.dot(vec3{v0_4d(2), v1_4d(2), v2_4d(2)}) == z * (v0_4d[3] + v1_4d[3] + v2_4d[3]));
+        return (a * v0_4d[2] + b * v1_4d[2] + c * v2_4d[2]) / (v0_4d[3] * a + v1_4d[3] * b + v2_4d[3] * c);
+    };
+
+    int arg_max = -1;
+    double value_max = -1.0;
+    vec3 alpha_beta_gamma;
+    for (int t = 0; t < n_triangles; t++)
+    {
+        auto v0 = vertices[indices[3 * t]];
+        auto v1 = vertices[indices[3 * t + 1]];
+        auto v2 = vertices[indices[3 * t + 2]];
+
+        auto v0_4d = P * Vector4d(v0, 1.0);
+        auto v1_4d = P * Vector4d(v1, 1.0);
+        auto v2_4d = P * Vector4d(v2, 1.0);
+        // v0_.head<3>() /= v0_(3);
+        // v1_.head<3>() /= v1_(3);
+        // v2_.head<3>() /= v2_(3);
+        auto v0_2d = v0_4d.head<2>() / v0_4d(3);
+        auto v1_2d = v1_4d.head<2>() / v0_4d(3);
+        auto v2_2d = v2_4d.head<2>() / v0_4d(3);
+
+        auto v0_2d_ = v0_2d - xm;
+        auto v1_2d_ = v1_2d - xm;
+        auto v2_2d_ = v2_2d - xm;
+        auto a = v0_2d_.cross(v1_2d_).norm();
+        auto b = v1_2d_.cross(v2_2d_).norm();
+        auto c = v2_2d_.cross(v0_2d_).norm();
+        if (a * b > 0.0 && b * c > 0.0)
+        {
+            vec3 abc;
+            double z = compute_z(v0_4d, v1_4d, v2_4d, xm, abc);
+            if (arg_max == -1 || z > value_max)
+            {
+                value_max = z;
+                arg_max = t;
+                alpha_beta_gamma = abc;
+            }
+        }
+    }
+    return {arg_max, value_max, alpha_beta_gamma};
+}
