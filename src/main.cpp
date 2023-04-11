@@ -13,6 +13,9 @@
 #include "light.h"
 #include "dynamics.h"
 #include "globals.h"
+#include <tetgen.h>
+
+
 void render_arrow(float len);
 Globals globals;
 unsigned int depthMapFBO,depthMap;
@@ -212,7 +215,7 @@ void reset_globals()
 #define CUBE_CASE
 #ifdef CUBE_CASE
     // shayMesh rendered_mesh("../src/assets/cube.obj");
-    auto body2_ptr = new shayMesh("../src/assets/bar.obj");
+    auto body2_ptr = new shayMesh("../src/assets/dragon_8kface.obj");
     shayMesh &rendered_mesh = *body2_ptr;
     auto &vertices{rendered_mesh.vertices};
 
@@ -278,10 +281,10 @@ int main()
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
     glfwSetCharCallback(window, char_callback);
-    // glfwSetMouseButtonCallback(window, click_callback);
+    glfwSetMouseButtonCallback(window, click_callback);
 
     // tell GLFW to capture our mouse
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
     // glad: load all OpenGL function pointers
     // ------------------------------------------------------------------
@@ -611,6 +614,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
     lastY = ypos;
 
     camera.ProcessMouseMovement(xoffset, yoffset);
+    
 }
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
@@ -832,6 +836,13 @@ void click_callback(GLFWwindow* window,int button,int action,int mods){
 //    auto proj_t = camera.Front / camera.Front[2] * -(z_camera + 0.5f);
 //    globals.body.force(proj_t[0], proj_t[1]);
 //}
+
+    Vector2f xm(lastX / SCR_WIDTH, 1 - lastY / SCR_HEIGHT);
+    xm = xm.array() * 2.0 - 1.0;
+    // normalize xm into range (-1, 1)
+    cout << xm.transpose();
+    assert(xm(0) >= 0.0 && xm(0) <= 1.0);
+    assert(xm(1) >= 0.0 && xm(1) <= 1.0);
 }
 
 vector<unsigned> bar_geometry(vector<vec3> &xcs)

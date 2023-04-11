@@ -414,12 +414,16 @@ tuple<int, double, vec3> raytrace_triangle(const Vector2d &xm, const Matrix4d &P
     {
         // computes the z value of the intersection point
         Vector2d xi[] = {
-            v0_4d.head<3>() - xm * v0_4d(3),
-            v1_4d.head<3>() - xm * v1_4d(3),
-            v2_4d.head<3>() - xm * v2_4d(3)};
-        double a = Matrix2d(xi[1], xi[2]).determinant();
-        double b = Matrix2d(xi[3], xi[0]).determinant();
-        double c = Matrix2d(xi[0], xi[1]).determinant();
+            v0_4d.head<2>() - xm * v0_4d(3),
+            v1_4d.head<2>() - xm * v1_4d(3),
+            v2_4d.head<2>() - xm * v2_4d(3)};
+        Matrix2d A0, A1, A2;
+        A0 << xi[1], xi[2];
+        A1 << xi[2], xi[0];
+        A2 << xi[0], xi[1];
+        double a = A0.determinant();
+        double b = A1.determinant();
+        double c = A2.determinant();
         mat3 A;
         A << xi[0], 1.0, xi[1], 1.0, xi[2], 1.0;
         alpha_beta_gamma = A.inverse() * vec3{0.0, 0.0, 1.0};
@@ -436,9 +440,9 @@ tuple<int, double, vec3> raytrace_triangle(const Vector2d &xm, const Matrix4d &P
         auto v1 = vertices[indices[3 * t + 1]];
         auto v2 = vertices[indices[3 * t + 2]];
 
-        auto v0_4d = P * Vector4d(v0, 1.0);
-        auto v1_4d = P * Vector4d(v1, 1.0);
-        auto v2_4d = P * Vector4d(v2, 1.0);
+        auto v0_4d = P * Vector4d(v0[0], v0[1], v0[2], 1.0);
+        auto v1_4d = P * Vector4d(v1[0], v1[1], v1[2], 1.0);
+        auto v2_4d = P * Vector4d(v2[0], v2[1], v2[2], 1.0);
         // v0_.head<3>() /= v0_(3);
         // v1_.head<3>() /= v1_(3);
         // v2_.head<3>() /= v2_(3);
@@ -449,9 +453,9 @@ tuple<int, double, vec3> raytrace_triangle(const Vector2d &xm, const Matrix4d &P
         auto v0_2d_ = v0_2d - xm;
         auto v1_2d_ = v1_2d - xm;
         auto v2_2d_ = v2_2d - xm;
-        auto a = v0_2d_.cross(v1_2d_).norm();
-        auto b = v1_2d_.cross(v2_2d_).norm();
-        auto c = v2_2d_.cross(v0_2d_).norm();
+        auto a = vec3(v0_2d_[0], v0_2d[1], 0.0).cross(vec3(v1_2d_[0], v1_2d_[1], 0.0)).norm();
+        auto b = vec3(v1_2d_[0], v1_2d[1], 0.0).cross(vec3(v2_2d_[0], v2_2d_[1], 0.0)).norm();
+        auto c = vec3(v2_2d_[0], v2_2d[1], 0.0).cross(vec3(v0_2d_[0], v0_2d_[1], 0.0)).norm();
         if (a * b > 0.0 && b * c > 0.0)
         {
             vec3 abc;
