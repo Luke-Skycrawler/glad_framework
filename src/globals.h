@@ -21,4 +21,7 @@ struct Globals {
     MassSpringMesh *mesh;
     shayMesh* rendered_mesh;
     json config;
+    Vector2d xm, dxm;
+    int selected;
+    Matrix4d P_inv, P;
 };

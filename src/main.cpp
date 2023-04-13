@@ -214,7 +214,7 @@ void reset_globals()
 {
     std::ifstream f("../src/config.json");
     globals.config = json::parse(f);
-
+    globals.selected = -1;
 #define CUBE_CASE
 #ifdef CUBE_CASE
     // shayMesh rendered_mesh("../src/assets/cube.obj");
@@ -642,6 +642,9 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 
     lastX = xpos;
     lastY = ypos;
+        Vector2d xm(lastX / SCR_WIDTH, 1 - lastY / SCR_HEIGHT);
+        xm = xm.array() * 2.0 - 1.0;
+    globals.xm = xm;
 
     camera.ProcessMouseMovement(xoffset, yoffset);
     
@@ -880,12 +883,50 @@ void click_callback(GLFWwindow* window,int button,int action,int mods){
             P_glm[0][2], P_glm[1][2], P_glm[2][2], P_glm[3][2],
             P_glm[0][3], P_glm[1][3], P_glm[2][3], P_glm[3][3];
         auto [ti, z, abc] = raytrace_triangle(xm, P, globals.mesh->mass_x, globals.rendered_mesh->indices);
-
+        if (ti == -1)
+        {
+            globals.selected = -1;
+            return;
+        }
         indices_highlight = ti;
-        spdlog::info("indice = {}", indices_highlight);
+        if (globals.config["verbose"])
+            spdlog::info("indice = {}", indices_highlight);
         auto l = P_glm * glm::vec4(-0.5f, -0.5f, -0.5f, 1.0f);
         auto u = P_glm * glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
-        spdlog::info("l, u = ({}, {}), ({}, {}), xm = ({}, {}) \n\n", l[0] / l[3],  l[1] / l[3], u[0] / u[3], u[1] / u[3], xm[0], xm[1]);
+        if (globals.config["verbose"])
+            spdlog::info("l, u = ({}, {}), ({}, {}), xm = ({}, {}) \n\n", l[0] / l[3], l[1] / l[3], u[0] / u[3], u[1] / u[3], xm[0], xm[1]);
+        const auto argmax = [](const vec3 &v) -> int
+        {
+            // returns the max index of v
+            if (v[0] > v[1] && v[0] > v[2])
+                return 0;
+            else if (v[1] > v[2])
+                return 1;
+            else
+                return 2;
+        };
+        auto t = argmax(abc);
+        auto selected_id = globals.rendered_mesh->indices[ti * 3 + t];
+        Vector4d xs4d;
+        xs4d << globals.mesh->mass_x[selected_id], 1.0;
+        auto xs4d_ = (P * xs4d);
+        auto xproj = xs4d_.head(2) / xs4d_[3];
+        auto dx = xm - xproj;
+        if (dx.norm() <globals.config["select_radius"])
+        {
+            globals.xm = xm;
+            globals.selected = selected_id;
+            globals.P_inv = P.inverse();
+            globals.P = P;
+            globals.dxm = dx;
+            spdlog::info("selected = {}", globals.selected);
+        }
+        else
+            globals.selected = -1;
+    }
+    else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
+        spdlog::info("released");
+        globals.selected = -1;
     }
 }
 

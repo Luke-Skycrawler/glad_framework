@@ -1,5 +1,5 @@
 {
-    "ks": 1e8,
+    "ks": 1e3,
     "bound": 1.0,
     "static": false,
     "gravity": false,
@@ -7,5 +7,8 @@
     "tol": 1e-3,
     "max_iters": 10,
     "kn": 1e9,
-    "verbose": false
+    "verbose": false,
+    "kp": 1e3,
+    "pickup": true,
+    "select_radius": 0.1
 }

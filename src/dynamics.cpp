@@ -61,6 +61,16 @@ void compute_force(VectorXd &b, const VectorXd &v_plus)
         b.segment<3> (i * 3) += globals.config["kn"] * cn * dt;
         // b.segment<3>(i * 3) += M * dv;
     }
+    if (globals.config["pickup"]) {
+        if (globals.selected  != -1) {
+            Vector4d dxm, x_screen;
+            x_screen << xs[globals.selected], 1.0;
+            x_screen = globals.P * x_screen;
+            dxm << globals.xm -  x_screen.head(2), 0.0, 0.0;
+            auto dx = globals.P_inv * dxm;
+            b.segment<3>(globals.selected * 3) += globals.config["kp"] * dx.segment<3>(0) * dt;
+        }
+    }
 }
 void compute_b(VectorXd &b, const VectorXd &v_plus)
 /****************************************
@@ -229,6 +239,20 @@ void compute_A(SparseMatrix<double> &sparse_matrix, const map<array<int, 2>, int
 #endif
             }
         }
+    if (globals.config["pickup"])
+    {
+        if (globals.selected != -1)
+        {
+#ifdef FANCY
+            int offset = starting_offset(globals.selected, globals.selected, lut, outers);
+            int _stride = stride(globals.selected, outers);
+            for (int k = 0; k < 3; k++)
+            {
+                values[offset + _stride * k + k] += globals.config["kp"] * dt * dt;
+            }
+#endif
+        }
+    }
 }
 
 void init_l0()
@@ -442,7 +466,7 @@ tuple<int, double, vec3> raytrace_triangle(const Vector2d &xm, const Matrix4d &P
     };
 
     int arg_max = -1;
-    double value_max = 1.0;
+    double value_max = 0.0;
     vec3 alpha_beta_gamma;
     int hit_count = 0;
     for (int t = 0; t < n_triangles; t++)
@@ -472,15 +496,17 @@ tuple<int, double, vec3> raytrace_triangle(const Vector2d &xm, const Matrix4d &P
             vec3 abc;
             hit_count++;
             double z = compute_z(v0_4d, v1_4d, v2_4d, xm, abc);
-            if (arg_max == -1 || z < value_max)
+            if (arg_max == -1 || z < value_max && z > -1.0) // z > -1.0 to filter the ones behind the camera
             {
                 value_max = z;
                 arg_max = t;
                 alpha_beta_gamma = abc;
             }
+            if (globals.config["verbose"])
             spdlog::info("triangle {} : z = {}, barycentric coordinates = ({}, {})", t, z, abc[0], abc[1]);
         }
     }
+    if (globals.config["verbose"])
     spdlog::warn("hit count = {}", hit_count);
     return {arg_max, value_max, alpha_beta_gamma};
 }
