@@ -108,6 +108,16 @@ shayMesh::shayMesh(const vector<vec3> &xcs, const vector<unsigned> &indices)
 void shayMesh::setupMesh()
 {
     // create buffers/arrays
+    nvn = nf * 3;
+    vs.reserve(nvn);
+    _indices.resize(nvn);
+    for (int i = 0; i < nf * 3; i++)
+    {
+        vs.push_back({vertices[indices[i]], Vector3f(0, 0, 0)});
+        _indices[i] = i;
+    }
+    compute_normals();
+
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
     glGenBuffers(1, &ebo);
@@ -118,15 +128,18 @@ void shayMesh::setupMesh()
     // A great thing about structs is that their memory layout is sequential for all its items.
     // The effect is that we can simply pass a pointer to the struct and it translates perfectly to a glm::vec3/2 array which
     // again translates to 3/2 floats which translates to a byte array.
-    glBufferData(GL_ARRAY_BUFFER, nv * sizeof(Vector3f), vertices.data(), GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, nvn * sizeof(vRender), vs.data(), GL_DYNAMIC_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, nf * sizeof(int) * 3, indices.data(), GL_DYNAMIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, nf * sizeof(int) * 3, _indices.data(), GL_DYNAMIC_DRAW);
 
     // set the vertex attribute pointers
     // vertex Positions
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vector3f), (void *)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vRender), (void *)0);
+
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(vRender), (void *)offsetof(vRender, normals));
 }
 
 void shayMesh::draw()
@@ -138,21 +151,30 @@ void shayMesh::draw()
 
 void shayMesh::update_positions()
 {
+    for (int i = 0; i < nf * 3; i++)
+    {
+        vs[i].pos = vertices[indices[i]];
+    }
+    compute_normals();
+
     glBindVertexArray(vao);
     // load data into vertex buffers
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     // A great thing about structs is that their memory layout is sequential for all its items.
     // The effect is that we can simply pass a pointer to the struct and it translates perfectly to a glm::vec3/2 array which
     // again translates to 3/2 floats which translates to a byte array.
-    glBufferData(GL_ARRAY_BUFFER, nv * sizeof(Vector3f), vertices.data(), GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, nvn * sizeof(vRender), vs.data(), GL_DYNAMIC_DRAW);
 
-    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    // glBufferData(GL_ELEMENT_ARRAY_BUFFER, nf * sizeof(int) * 3, indices.data(), GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, nf * sizeof(int) * 3, _indices.data(), GL_DYNAMIC_DRAW);
 
     // set the vertex attribute pointers
     // vertex Positions
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vector3f), (void *)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vRender), (void *)0);
+
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(vRender), (void *)offsetof(vRender, normals));
 }
 
 // lighting
@@ -218,8 +240,8 @@ void reset_globals()
 #define CUBE_CASE
 #ifdef CUBE_CASE
     // shayMesh rendered_mesh("../src/assets/cube.obj");
-    // auto body2_ptr = new shayMesh("../src/assets/dragon_8kface.obj");
-    auto body2_ptr = new shayMesh("../src/assets/cube.obj");
+    auto body2_ptr = new shayMesh("../src/assets/dragon_8kface.obj");
+    // auto body2_ptr = new shayMesh("../src/assets/cube.obj");
     shayMesh &rendered_mesh = *body2_ptr;
     auto &vertices{rendered_mesh.vertices};
 
@@ -497,10 +519,11 @@ int main()
             shader.setMat4("model", glm::mat4(1.0f));
             // model = glm::translate(model, from_eigen(globals.body ->S[0].x));
             // shader.setMat4("model", model);
-            shader.setVec3("objectColor", 1.0f, 1.0f, 1.0f);
+            shader.setVec3("objectColor", 0.8f, 0.8f, 0.8f);
 
             // body.Draw(shader);
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            if (globals.config["wireframe"])
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
             globals.rendered_mesh->draw();
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -519,36 +542,37 @@ int main()
                 triangle_highlight->draw();
             }
         };
-        if(display_corner){
-            glBindFramebuffer(GL_FRAMEBUFFER,depthMapFBO);
-            glEnable(GL_DEPTH_TEST);
-            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-            depthShader.use();
+        if (display_corner)
+        {
+        glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+        glEnable(GL_DEPTH_TEST);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        depthShader.use();
 
-            // view/projection transformations
-            model = glm::mat4(1.0f);
+        // view/projection transformations
+        model = glm::mat4(1.0f);
 
-            // depthShader.setMat4("projection",projection);
-            depthShader.setMat4("projection",glm::perspective(glm::radians(89.0f),(float)SHADOW_WIDTH/SHADOW_HEIGHT,0.1f,10.0f));
-            depthShader.setMat4("view",lightSpaceTrans);
-            depthShader.setMat4("model",model);
-            depthShader.setVec3("viewPos",lightPos);
-            renderScene(depthShader);
-            glBindFramebuffer(GL_FRAMEBUFFER,0);
-            model = glm::mat4(1.0f);
+        // depthShader.setMat4("projection",projection);
+        depthShader.setMat4("projection", glm::perspective(glm::radians(89.0f), (float)SHADOW_WIDTH / SHADOW_HEIGHT, 0.1f, 10.0f));
+        depthShader.setMat4("view", lightSpaceTrans);
+        depthShader.setMat4("model", model);
+        depthShader.setVec3("viewPos", lightPos);
+        renderScene(depthShader);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        model = glm::mat4(1.0f);
         }
- 
+
         int viewport[4];
-        glGetIntegerv(GL_VIEWPORT,viewport);
+        glGetIntegerv(GL_VIEWPORT, viewport);
         lightingShader.use();
-        lightingShader.setVec2("pickPosition",glm::vec2(lastX/viewport[2]*2-1.0f,(1-lastY/viewport[3])*2-1.0f));
-        lightingShader.setMat4("lightView",glm::perspective(glm::radians(89.0f),(float)SHADOW_WIDTH/SHADOW_HEIGHT,0.1f,10.0f)*lightSpaceTrans);
+        lightingShader.setVec2("pickPosition", glm::vec2(lastX / viewport[2] * 2 - 1.0f, (1 - lastY / viewport[3]) * 2 - 1.0f));
+        lightingShader.setMat4("lightView", glm::perspective(glm::radians(89.0f), (float)SHADOW_WIDTH / SHADOW_HEIGHT, 0.1f, 10.0f) * lightSpaceTrans);
         view = camera.GetViewMatrix();
         lightingShader.setVec3("objectColor", 1.0f, 0.5f, 0.31f);
-        lightingShader.setVec3("lightColor",  1.0f, 1.0f, 1.0f);
-        lightingShader.setVec3("lightPos",lightPos);
-        lightingShader.setVec3("viewPos",camera.Position);
+        lightingShader.setVec3("lightColor", 1.0f, 1.0f, 1.0f);
+        lightingShader.setVec3("lightPos", lightPos);
+        lightingShader.setVec3("viewPos", camera.Position);
         // view/projection transformations
         lightingShader.setMat4("projection", projection);
         lightingShader.setMat4("view", view);
@@ -562,22 +586,24 @@ int main()
         // bind specular map
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, specularMap);
-        if(display_corner){
-            glActiveTexture(GL_TEXTURE2);
-            glBindTexture(GL_TEXTURE_2D,depthMap);
+        if (display_corner)
+        {
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, depthMap);
         }
         renderScene(lightingShader);
         // also draw the lamp object
         // lights.Draw(camera);
 
-        if(display_corner){
-            glBindFramebuffer(GL_FRAMEBUFFER,0);
-            glDisable(GL_DEPTH_TEST);
-            cornerShader.use();
-            glBindVertexArray(cornerVAO);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D,depthMap);
-            glDrawArrays(GL_TRIANGLES,0,6);
+        if (display_corner)
+        {
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glDisable(GL_DEPTH_TEST);
+        cornerShader.use();
+        glBindVertexArray(cornerVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, depthMap);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
         }
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // ------------------------------------------------------------------
@@ -596,16 +622,17 @@ int main()
     delete globals.mesh;
     return 0;
 }
-void gen_preview_framebuffer(){
-    glGenFramebuffers(1,&depthMapFBO);
+void gen_preview_framebuffer()
+{
+    glGenFramebuffers(1, &depthMapFBO);
     glGenTextures(1, &depthMap);
     glBindTexture(GL_TEXTURE_2D, depthMap);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 
-                SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
+                 SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); 
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
     glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
@@ -616,19 +643,18 @@ void gen_preview_framebuffer(){
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
 
-
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
 // ---------------------------------------------------------------------------------------------
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+void framebuffer_size_callback(GLFWwindow *window, int width, int height)
 {
-    // make sure the viewport matches the new window dimensions; note that width and 
+    // make sure the viewport matches the new window dimensions; note that width and
     // height will be significantly larger than specified on retina displays.
     glViewport(0, 0, width, height);
 }
 
 // glfw: whenever the mouse moves, this callback is called
 // -------------------------------------------------------
-void mouse_callback(GLFWwindow* window, double xpos, double ypos)
+void mouse_callback(GLFWwindow *window, double xpos, double ypos)
 {
     if (firstMouse)
     {
@@ -642,12 +668,24 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 
     lastX = xpos;
     lastY = ypos;
-        Vector2d xm(lastX / SCR_WIDTH, 1 - lastY / SCR_HEIGHT);
-        xm = xm.array() * 2.0 - 1.0;
-    globals.xm = xm;
-
+    Vector2d xm(lastX / SCR_WIDTH, 1 - lastY / SCR_HEIGHT);
+    xm = xm.array() * 2.0 - 1.0;
     camera.ProcessMouseMovement(xoffset, yoffset);
-    
+    if (globals.selected != -1)
+    {
+        globals.xm = xm;
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 1.0f, 100.0f);
+        glm::mat4 view = camera.GetViewMatrix();
+        auto P_glm = projection * view;
+        Matrix4d P;
+        P << P_glm[0][0], P_glm[1][0], P_glm[2][0], P_glm[3][0],
+            P_glm[0][1], P_glm[1][1], P_glm[2][1], P_glm[3][1],
+            P_glm[0][2], P_glm[1][2], P_glm[2][2], P_glm[3][2],
+            P_glm[0][3], P_glm[1][3], P_glm[2][3], P_glm[3][3];
+        globals.P = P;
+        globals.P_inv = P.inverse();
+        cout << xm.transpose() << "\n";
+    }
 }
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
@@ -927,6 +965,7 @@ void click_callback(GLFWwindow* window,int button,int action,int mods){
     else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
         spdlog::info("released");
         globals.selected = -1;
+        indices_highlight = -1;
     }
 }
 
@@ -999,4 +1038,23 @@ vector<unsigned> bar_geometry(vector<vec3> &xcs)
         xcs[i] = xc(i);
     }
     return indices;
+}
+
+void shayMesh::compute_normals(bool clockwise)
+{
+    for (unsigned int i = 0; i < nvn; i++)
+        vs[i].normals = Vector3f(0, 0, 0); // initialize all normals to zero
+    auto &f{indices};
+    auto &v{vertices};
+    for (unsigned int i = 0; i < nf; i++)
+    {
+        Vector3f N = (vs[i * 3 + 1].pos - vs[i * 3 + 0].pos).cross(vs[i * 3 + 2].pos - vs[i * 3 + 0].pos); // face normal (not normalized)
+        if (clockwise)
+            N = -N;
+        vs[i * 3 + 0].normals += N;
+        vs[i * 3 + 1].normals += N;
+        vs[i * 3 + 2].normals += N;
+    }
+    for (unsigned int i = 0; i < nvn; i++)
+        vs[i].normals = vs[i].normals.normalized();
 }

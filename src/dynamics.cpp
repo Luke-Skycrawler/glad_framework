@@ -62,14 +62,16 @@ void compute_force(VectorXd &b, const VectorXd &v_plus)
         // b.segment<3>(i * 3) += M * dv;
     }
     if (globals.config["pickup"]) {
-        if (globals.selected  != -1) {
-            Vector4d dxm, x_screen;
-            x_screen << xs[globals.selected], 1.0;
-            x_screen = globals.P * x_screen;
-            dxm << globals.xm -  x_screen.head(2), 0.0, 0.0;
-            auto dx = globals.P_inv * dxm;
-            b.segment<3>(globals.selected * 3) += globals.config["kp"] * dx.segment<3>(0) * dt;
-        }
+    auto s = globals.selected;
+    if (s != -1)
+    {
+        Vector4d dxm, x_screen;
+        x_screen << xs[s] + v_plus.segment<3>(s * 3) * dt, 1.0;
+        x_screen = globals.P * x_screen;
+        dxm << globals.xm - x_screen.head(2), 0.0, 0.0;
+        auto dx = globals.P_inv * dxm;
+        b.segment<3>(s * 3) += globals.config["kp"] * dx.segment<3>(0) * dt;
+    }
     }
 }
 void compute_b(VectorXd &b, const VectorXd &v_plus)

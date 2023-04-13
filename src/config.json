@@ -1,14 +1,15 @@
 {
-    "ks": 1e3,
+    "ks": 1e8,
     "bound": 1.0,
     "static": false,
     "gravity": false,
     "collision": true,
     "tol": 1e-3,
-    "max_iters": 10,
+    "max_iters": 1,
     "kn": 1e9,
     "verbose": false,
-    "kp": 1e3,
+    "kp": 1e8,
     "pickup": true,
-    "select_radius": 0.1
+    "select_radius": 0.1,
+    "wireframe": false
 }

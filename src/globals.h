@@ -4,17 +4,22 @@
 #include "dynamics.h"
 
 using json = nlohmann::json;
+struct vRender {
+    Vector3f pos, normals;
+};
 struct shayMesh
 {
     vector<Vector3f> vertices;
-    vector<unsigned> indices;
-    int nv, nf;
+    vector<vRender> vs;
+    vector<unsigned> indices, _indices;
+    int nv, nf, nvn;
     shayMesh(const string &filename);
     shayMesh(const vector<vec3> &xcs, const vector<unsigned> &indices);
     unsigned vao, vbo, ebo;
     void setupMesh();
     void draw();
     void update_positions();
+    void compute_normals(bool clockwise = true);
 };
 
 struct Globals {
