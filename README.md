@@ -7,6 +7,7 @@ Navigate to the vcpkg directory, and installed the following packages via vcpkg,
 
 Navigate to the root directory `glad_framework`, and type in  
 `cmake -B "build" -S . -DCMAKE_TOOLCHAIN_FILE=[path to vcpkg]/scripts/buildsystems/vcpkg.cmake`
+cmake -B "build" -S . -DCMAKE_TOOLCHAIN_FILE=D:/vcpkg/scripts/buildsystems/vcpkg.cmake
 `cmake --build build`
 
 ## Linux building

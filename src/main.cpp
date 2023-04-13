@@ -13,7 +13,7 @@
 #include "light.h"
 #include "dynamics.h"
 #include "globals.h"
-#include <tetgen.h>
+//#include <tetgen.h>
 
 
 void render_arrow(float len);
@@ -875,10 +875,10 @@ void click_callback(GLFWwindow* window,int button,int action,int mods){
         glm::mat4 view = camera.GetViewMatrix();
         auto P_glm = projection * view;
         Matrix4d P;
-        P << P_glm[0][0], P_glm[0][1], P_glm[0][2], P_glm[0][3],
-            P_glm[1][0], P_glm[1][1], P_glm[1][2], P_glm[1][3],
-            P_glm[2][0], P_glm[2][1], P_glm[2][2], P_glm[2][3],
-            P_glm[3][0], P_glm[3][1], P_glm[3][2], P_glm[3][3];
+        P << P_glm[0][0], P_glm[1][0], P_glm[2][0], P_glm[3][0],
+            P_glm[0][1], P_glm[1][1], P_glm[2][1], P_glm[3][1],
+            P_glm[0][2], P_glm[1][2], P_glm[2][2], P_glm[3][2],
+            P_glm[0][3], P_glm[1][3], P_glm[2][3], P_glm[3][3];
         auto [ti, z, abc] = raytrace_triangle(xm, P, globals.mesh->mass_x, globals.rendered_mesh->indices);
 
         indices_highlight = ti;

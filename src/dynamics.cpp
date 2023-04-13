@@ -442,8 +442,9 @@ tuple<int, double, vec3> raytrace_triangle(const Vector2d &xm, const Matrix4d &P
     };
 
     int arg_max = -1;
-    double value_max = -1.0;
+    double value_max = 1.0;
     vec3 alpha_beta_gamma;
+    int hit_count = 0;
     for (int t = 0; t < n_triangles; t++)
     {
         auto v0 = vertices[indices[3 * t]];
@@ -463,14 +464,15 @@ tuple<int, double, vec3> raytrace_triangle(const Vector2d &xm, const Matrix4d &P
         auto v0_2d_ = v0_2d - xm;
         auto v1_2d_ = v1_2d - xm;
         auto v2_2d_ = v2_2d - xm;
-        auto a = vec3(v0_2d_[0], v0_2d_[1], 0.0).cross(vec3(v1_2d_[0], v1_2d_[1], 0.0));
-        auto b = vec3(v1_2d_[0], v1_2d_[1], 0.0).cross(vec3(v2_2d_[0], v2_2d_[1], 0.0));
-        auto c = vec3(v2_2d_[0], v2_2d_[1], 0.0).cross(vec3(v0_2d_[0], v0_2d_[1], 0.0));
-        if (a.dot(b) > 0.0 && b.dot(c) > 0.0)
+        auto a = vec3(v0_2d_[0], v0_2d_[1], 0.0).cross(vec3(v1_2d_[0], v1_2d_[1], 0.0))(2);
+        auto b = vec3(v1_2d_[0], v1_2d_[1], 0.0).cross(vec3(v2_2d_[0], v2_2d_[1], 0.0))(2);
+        auto c = vec3(v2_2d_[0], v2_2d_[1], 0.0).cross(vec3(v0_2d_[0], v0_2d_[1], 0.0))(2);
+        if (a * b > 0.0 && b * c > 0.0)
         {
             vec3 abc;
+            hit_count++;
             double z = compute_z(v0_4d, v1_4d, v2_4d, xm, abc);
-            if (arg_max == -1 || z > value_max)
+            if (arg_max == -1 || z < value_max)
             {
                 value_max = z;
                 arg_max = t;
@@ -479,5 +481,6 @@ tuple<int, double, vec3> raytrace_triangle(const Vector2d &xm, const Matrix4d &P
             spdlog::info("triangle {} : z = {}, barycentric coordinates = ({}, {})", t, z, abc[0], abc[1]);
         }
     }
+    spdlog::warn("hit count = {}", hit_count);
     return {arg_max, value_max, alpha_beta_gamma};
 }

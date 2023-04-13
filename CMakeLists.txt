@@ -10,8 +10,8 @@ find_package(glad CONFIG REQUIRED)
 find_package (Eigen3 3.3 NO_MODULE)
 find_package(spdlog REQUIRED)
 set(PROJECT_NAME main)
-set(TETGEN_DIRS "D:/0IOS Games/OneDrive - zju.edu.cn/Curriculum/noble research/ref repos/tetgen")
-find_library(TETGEN_LIB tetgen PATHS "${TETGEN_DIRS}/build/Debug")
+# set(TETGEN_DIRS "D:/0IOS Games/OneDrive - zju.edu.cn/Curriculum/noble research/ref repos/tetgen")
+# find_library(TETGEN_LIB tetgen PATHS "${TETGEN_DIRS}/build/Debug")
 ################################################################################
 # Source groups
 ################################################################################
@@ -51,11 +51,11 @@ target_include_directories(main PRIVATE
     ${GLM_INCLUDE_DIRS} 
     ${GLFW3_INCLUDE_DIRS} 
     ${ASSIMP_INCLUDE_DIRS} 
-    ${GLAD_INCLUDE_DIRS}
-    ${TETGEN_DIRS})
+    ${GLAD_INCLUDE_DIRS})
+    # ${TETGEN_DIRS})
 
 target_sources(main PRIVATE ${ALL_FILES})
-target_link_libraries(main PRIVATE glfw assimp::assimp glad::glad glm::glm Eigen3::Eigen spdlog::spdlog_header_only ${TETGEN_LIB})
+target_link_libraries(main PRIVATE glfw assimp::assimp glad::glad glm::glm Eigen3::Eigen spdlog::spdlog_header_only) # ${TETGEN_LIB})
 
 # set_property(TARGET main PROPERTY CXX_STANDARD 20)
 
