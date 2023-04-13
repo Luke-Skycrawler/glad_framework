@@ -239,6 +239,14 @@ void reset_globals()
         else is_static[i] = false;
     }
     globals.mesh = new MassSpringMesh{velocity, position, edges, is_static};
+
+
+    //tetgenio tet;
+    //tet.load_node("a.node");
+    //tet.load_elem("a.ele");
+    //tet.facetlist;
+    //tet.pointlist;
+    //tet.edgelist;
 #else
     vector<vec3> xcs, vcs;
     auto bar_indices = bar_geometry(xcs);
@@ -837,12 +845,21 @@ void click_callback(GLFWwindow* window,int button,int action,int mods){
 //    globals.body.force(proj_t[0], proj_t[1]);
 //}
 
-    Vector2f xm(lastX / SCR_WIDTH, 1 - lastY / SCR_HEIGHT);
+    Vector2d xm(lastX / SCR_WIDTH, 1 - lastY / SCR_HEIGHT);
     xm = xm.array() * 2.0 - 1.0;
     // normalize xm into range (-1, 1)
     cout << xm.transpose();
-    assert(xm(0) >= 0.0 && xm(0) <= 1.0);
-    assert(xm(1) >= 0.0 && xm(1) <= 1.0);
+    assert(xm(0) >= -1.0 && xm(0) <= 1.0);
+    assert(xm(1) >= -1.0 && xm(1) <= 1.0);
+            glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 1.0f, 100.0f);
+        glm::mat4 view = camera.GetViewMatrix();
+    auto P_glm = projection * view;
+    Matrix4d P;
+    P << P_glm[0][0], P_glm[0][1], P_glm[0][2], P_glm[0][3],
+        P_glm[1][0], P_glm[1][1], P_glm[1][2], P_glm[1][3],
+        P_glm[2][0], P_glm[2][1], P_glm[2][2], P_glm[2][3],
+        P_glm[3][0], P_glm[3][1], P_glm[3][2], P_glm[3][3];
+    auto [ti, z, abc ] = raytrace_triangle(xm, P, globals.mesh->mass_x, globals.rendered_mesh->indices);
 }
 
 vector<unsigned> bar_geometry(vector<vec3> &xcs)

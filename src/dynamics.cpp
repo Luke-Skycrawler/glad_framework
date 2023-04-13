@@ -425,10 +425,19 @@ tuple<int, double, vec3> raytrace_triangle(const Vector2d &xm, const Matrix4d &P
         double b = A1.determinant();
         double c = A2.determinant();
         mat3 A;
-        A << xi[0], 1.0, xi[1], 1.0, xi[2], 1.0;
+        // A << xi[0][0], xi[0][1], 1.0, xi[1][0], xi[1][1], 1.0, xi[2][0], xi[2][1], 1.0;
+        A << vec3{xi[0][0], xi[0][1], 1.0},
+            vec3{xi[1][0], xi[1][1], 1.0},
+            vec3{xi[2][0], xi[2][1], 1.0};
+
         alpha_beta_gamma = A.inverse() * vec3{0.0, 0.0, 1.0};
-        assert(alpha_beta_gamma.dot(vec3{v0_4d(2), v1_4d(2), v2_4d(2)}) == z * (v0_4d[3] + v1_4d[3] + v2_4d[3]));
-        return (a * v0_4d[2] + b * v1_4d[2] + c * v2_4d[2]) / (v0_4d[3] * a + v1_4d[3] * b + v2_4d[3] * c);
+        // assert(alpha_beta_gamma.dot(vec3{v0_4d(2), v1_4d(2), v2_4d(2)}) == z * (v0_4d[3] + v1_4d[3] + v2_4d[3]));
+        double z =
+            (a * v0_4d[2] + b * v1_4d[2] + c * v2_4d[2]) / (v0_4d[3] * a + v1_4d[3] * b + v2_4d[3] * c);
+        double z1 = alpha_beta_gamma.dot(vec3{v0_4d(2), v1_4d(2), v2_4d(2)});
+        double w1 = alpha_beta_gamma.dot(vec3{v0_4d(3), v1_4d(3), v2_4d(3)});
+        double z2 = z1 / w1;
+        return z;
     };
 
     int arg_max = -1;
@@ -453,10 +462,10 @@ tuple<int, double, vec3> raytrace_triangle(const Vector2d &xm, const Matrix4d &P
         auto v0_2d_ = v0_2d - xm;
         auto v1_2d_ = v1_2d - xm;
         auto v2_2d_ = v2_2d - xm;
-        auto a = vec3(v0_2d_[0], v0_2d[1], 0.0).cross(vec3(v1_2d_[0], v1_2d_[1], 0.0)).norm();
-        auto b = vec3(v1_2d_[0], v1_2d[1], 0.0).cross(vec3(v2_2d_[0], v2_2d_[1], 0.0)).norm();
-        auto c = vec3(v2_2d_[0], v2_2d[1], 0.0).cross(vec3(v0_2d_[0], v0_2d_[1], 0.0)).norm();
-        if (a * b > 0.0 && b * c > 0.0)
+        auto a = vec3(v0_2d_[0], v0_2d_[1], 0.0).cross(vec3(v1_2d_[0], v1_2d_[1], 0.0));
+        auto b = vec3(v1_2d_[0], v1_2d_[1], 0.0).cross(vec3(v2_2d_[0], v2_2d_[1], 0.0));
+        auto c = vec3(v2_2d_[0], v2_2d_[1], 0.0).cross(vec3(v0_2d_[0], v0_2d_[1], 0.0));
+        if (a.dot(b) > 0.0 && b.dot(c) > 0.0)
         {
             vec3 abc;
             double z = compute_z(v0_4d, v1_4d, v2_4d, xm, abc);
