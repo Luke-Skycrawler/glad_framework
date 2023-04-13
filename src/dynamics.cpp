@@ -297,7 +297,8 @@ void implicit_euler(SparseMatrix<double> &sparse_matrix, const map<array<int, 2>
         if (++iter >= globals.config["max_iters"])
             break;
     } while (true);
-    cout << "iter = " << iter << ", norm v = " << v_plus.norm() << "\n";
+    if (globals.config["verbose"])
+        cout << "iter = " << iter << ", norm v = " << v_plus.norm() << "\n";
     for (int i = 0; i < n_mass; i++)
     {
         auto vi = v_plus.segment<3>(i * 3);
@@ -456,8 +457,8 @@ tuple<int, double, vec3> raytrace_triangle(const Vector2d &xm, const Matrix4d &P
         // v1_.head<3>() /= v1_(3);
         // v2_.head<3>() /= v2_(3);
         auto v0_2d = v0_4d.head<2>() / v0_4d(3);
-        auto v1_2d = v1_4d.head<2>() / v0_4d(3);
-        auto v2_2d = v2_4d.head<2>() / v0_4d(3);
+        auto v1_2d = v1_4d.head<2>() / v1_4d(3);
+        auto v2_2d = v2_4d.head<2>() / v2_4d(3);
 
         auto v0_2d_ = v0_2d - xm;
         auto v1_2d_ = v1_2d - xm;
@@ -475,6 +476,7 @@ tuple<int, double, vec3> raytrace_triangle(const Vector2d &xm, const Matrix4d &P
                 arg_max = t;
                 alpha_beta_gamma = abc;
             }
+            spdlog::info("triangle {} : z = {}, barycentric coordinates = ({}, {})", t, z, abc[0], abc[1]);
         }
     }
     return {arg_max, value_max, alpha_beta_gamma};

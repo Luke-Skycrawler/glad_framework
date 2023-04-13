@@ -2,9 +2,10 @@
     "ks": 1e8,
     "bound": 1.0,
     "static": false,
-    "gravity": true,
+    "gravity": false,
     "collision": true,
     "tol": 1e-3,
     "max_iters": 10,
-    "kn": 1e9
+    "kn": 1e9,
+    "verbose": false
 }

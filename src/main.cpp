@@ -127,14 +127,14 @@ void shayMesh::setupMesh()
     // vertex Positions
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vector3f), (void *)0);
-    }
+}
 
-    void shayMesh::draw()
-    {
-        glBindVertexArray(vao);
-        glDrawElements(GL_TRIANGLES, nf * 3, GL_UNSIGNED_INT, 0);
-        glBindVertexArray(0);
-    }
+void shayMesh::draw()
+{
+    glBindVertexArray(vao);
+    glDrawElements(GL_TRIANGLES, nf * 3, GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
+}
 
 void shayMesh::update_positions()
 {
@@ -207,6 +207,9 @@ void processInput(GLFWwindow* window)
     // }
     // else globals.body.f = glm::vec2(0.0);
 }
+
+shayMesh *triangle_highlight;
+int indices_highlight = -1;
 void reset_globals()
 {
     std::ifstream f("../src/config.json");
@@ -215,7 +218,8 @@ void reset_globals()
 #define CUBE_CASE
 #ifdef CUBE_CASE
     // shayMesh rendered_mesh("../src/assets/cube.obj");
-    auto body2_ptr = new shayMesh("../src/assets/dragon_8kface.obj");
+    // auto body2_ptr = new shayMesh("../src/assets/dragon_8kface.obj");
+    auto body2_ptr = new shayMesh("../src/assets/cube.obj");
     shayMesh &rendered_mesh = *body2_ptr;
     auto &vertices{rendered_mesh.vertices};
 
@@ -240,13 +244,14 @@ void reset_globals()
     }
     globals.mesh = new MassSpringMesh{velocity, position, edges, is_static};
 
+    // tetgenio tet;
+    // tet.load_node("a.node");
+    // tet.load_elem("a.ele");
+    // tet.facetlist;
+    // tet.pointlist;
+    // tet.edgelist;
+    triangle_highlight = new shayMesh("../src/assets/tri.obj");
 
-    //tetgenio tet;
-    //tet.load_node("a.node");
-    //tet.load_elem("a.ele");
-    //tet.facetlist;
-    //tet.pointlist;
-    //tet.edgelist;
 #else
     vector<vec3> xcs, vcs;
     auto bar_indices = bar_geometry(xcs);
@@ -384,25 +389,25 @@ int main()
     unsigned int diffuseMap = loadTexture("../src/assets/wood.png");
     unsigned int specularMap = loadTexture("../src/assets/wood_specular.png");
 
-    cornerShader.setInt("screenTexture",0);
-    
+    cornerShader.setInt("screenTexture", 0);
+
     unsigned int texColorBuffer;
-    glGenTextures(1,&texColorBuffer);
-    glBindTexture(GL_TEXTURE_2D,texColorBuffer);
-    glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,SCR_WIDTH,SCR_HEIGHT,0,GL_RGB,GL_UNSIGNED_BYTE,NULL);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,texColorBuffer,0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_STENCIL_ATTACHMENT,GL_TEXTURE_2D,texColorBuffer,0);
+    glGenTextures(1, &texColorBuffer);
+    glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, texColorBuffer, 0);
 
     unsigned int rbo;
-    glGenRenderbuffers(1,&rbo);
-    glBindRenderbuffer(GL_RENDERBUFFER,rbo);
-    glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH24_STENCIL8,SCR_WIDTH,SCR_HEIGHT);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_STENCIL_ATTACHMENT,GL_RENDERBUFFER,rbo);
-    if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE)
-        std::cout<<"error: framebuffer\n";
-    glBindFramebuffer(GL_FRAMEBUFFER,0);
+    glGenRenderbuffers(1, &rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "error: framebuffer\n";
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     gen_preview_framebuffer();
     // ------------------------------------------------------------------
@@ -411,9 +416,9 @@ int main()
     lightingShader.use();
     lightingShader.setInt("material.diffuse", 0);
     lightingShader.setInt("material.specular", 1);
-    lightingShader.setInt("shadowMap",2);
-    
-    lightingShader.setFloat("material.shininess",64);
+    lightingShader.setInt("shadowMap", 2);
+
+    lightingShader.setFloat("material.shininess", 64);
 
     // ------------------------------------------------------------------
     // render loop
@@ -431,20 +436,20 @@ int main()
         auto &vertices{globals.rendered_mesh->vertices};
         for (int i = 0; i < vertices.size(); i++)
         {
-            auto &p{globals.mesh->mass_x[i]};
-            vertices[i] = Vector3f(p[0], p[1], p[2]);
+        auto &p{globals.mesh->mass_x[i]};
+        vertices[i] = Vector3f(p[0], p[1], p[2]);
         }
         globals.rendered_mesh->update_positions();
         // input
         processInput(window);
         // render setup
-        glBindFramebuffer(GL_FRAMEBUFFER,0);
-        glClearColor(0.1f,0.1f,0.1f,1.0f);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_STENCIL_TEST);
-        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
-        glStencilOp(GL_KEEP,GL_KEEP,GL_REPLACE);
-        glStencilFunc(GL_ALWAYS,1,0XFF);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+        glStencilFunc(GL_ALWAYS, 1, 0XFF);
         glStencilMask(0XFF);
         lightingShader.use();
 
@@ -452,13 +457,13 @@ int main()
         // render
         // ------------------------------------------------------------------
         // be sure to activate shader when setting uniforms/drawing objects
-        float scale=1.02;
+        float scale = 1.02;
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 1.0f, 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
         glm::mat4 model = glm::mat4(1.0f);
-        glm::mat4 tmpmodel=glm::scale(model,glm::vec3(scale,scale,scale));
-        glm::vec3 box2Pos(0.3,0.0,1.2);
-        glm::mat4 lightSpaceTrans = glm::lookAt(lightPos,glm::vec3(0.0f),camera.WorldUp);
+        glm::mat4 tmpmodel = glm::scale(model, glm::vec3(scale, scale, scale));
+        glm::vec3 box2Pos(0.3, 0.0, 1.2);
+        glm::mat4 lightSpaceTrans = glm::lookAt(lightPos, glm::vec3(0.0f), camera.WorldUp);
 
         const auto renderScene = [&](Shader &shader)
         {
@@ -470,32 +475,49 @@ int main()
             renderPlane();
 
             model = glm::mat4(1.0f);
-            model[1][1] = 0.0f; 
+            model[1][1] = 0.0f;
             model[2][2] = 0.0f;
             model[1][2] = 1.0f;
             model[2][1] = 1.0f;
             shader.setMat4("model", glm::translate(model, glm::vec3(0.0f, 0.0f, boundf)));
             renderPlane();
-            shader.setMat4("model", glm::translate(model, glm::vec3(0.0f, 0.0f,-boundf)));
+            shader.setMat4("model", glm::translate(model, glm::vec3(0.0f, 0.0f, -boundf)));
             renderPlane();
 
             model = glm::mat4(1.0f);
-            model[0][0] = 0.0f; 
+            model[0][0] = 0.0f;
             model[2][2] = 0.0f;
             model[0][2] = 1.0f;
             model[2][0] = 1.0f;
             shader.setMat4("model", glm::translate(model, glm::vec3(0.0f, 0.0f, boundf)));
             renderPlane();
-            shader.setMat4("model", glm::translate(model, glm::vec3(0.0f, 0.0f,-boundf)));
+            shader.setMat4("model", glm::translate(model, glm::vec3(0.0f, 0.0f, -boundf)));
             renderPlane();
 
             shader.setMat4("model", glm::mat4(1.0f));
-            //model = glm::translate(model, from_eigen(globals.body ->S[0].x));
-            //shader.setMat4("model", model);
+            // model = glm::translate(model, from_eigen(globals.body ->S[0].x));
+            // shader.setMat4("model", model);
             shader.setVec3("objectColor", 1.0f, 1.0f, 1.0f);
 
             // body.Draw(shader);
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
             globals.rendered_mesh->draw();
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+            auto &vs = triangle_highlight->vertices;
+            if (indices_highlight != -1)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    auto vid = globals.rendered_mesh->indices[indices_highlight * 3 + i];
+                    vs[i] = globals.rendered_mesh->vertices[vid];
+                }
+                triangle_highlight->update_positions();
+                shader.setVec3("objectColor", 1.0f, 0.0f, 0.0f);
+                shader.setMat4("model", glm::mat4(1.0f));
+                triangle_highlight->draw();
+            }
         };
         if(display_corner){
             glBindFramebuffer(GL_FRAMEBUFFER,depthMapFBO);
@@ -839,27 +861,32 @@ void render_arrow(float len){
     glDrawArrays(GL_TRIANGLES, 0, 36);
 }
 void click_callback(GLFWwindow* window,int button,int action,int mods){
-//if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
-//{
-//    auto proj_t = camera.Front / camera.Front[2] * -(z_camera + 0.5f);
-//    globals.body.force(proj_t[0], proj_t[1]);
-//}
-
-    Vector2d xm(lastX / SCR_WIDTH, 1 - lastY / SCR_HEIGHT);
-    xm = xm.array() * 2.0 - 1.0;
-    // normalize xm into range (-1, 1)
-    cout << xm.transpose();
-    assert(xm(0) >= -1.0 && xm(0) <= 1.0);
-    assert(xm(1) >= -1.0 && xm(1) <= 1.0);
-            glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 1.0f, 100.0f);
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+    {
+        //    auto proj_t = camera.Front / camera.Front[2] * -(z_camera + 0.5f);
+        //    globals.body.force(proj_t[0], proj_t[1]);
+        Vector2d xm(lastX / SCR_WIDTH, 1 - lastY / SCR_HEIGHT);
+        xm = xm.array() * 2.0 - 1.0;
+        // normalize xm into range (-1, 1)
+        // cout << xm.transpose();
+        assert(xm(0) >= -1.0 && xm(0) <= 1.0);
+        assert(xm(1) >= -1.0 && xm(1) <= 1.0);
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 1.0f, 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
-    auto P_glm = projection * view;
-    Matrix4d P;
-    P << P_glm[0][0], P_glm[0][1], P_glm[0][2], P_glm[0][3],
-        P_glm[1][0], P_glm[1][1], P_glm[1][2], P_glm[1][3],
-        P_glm[2][0], P_glm[2][1], P_glm[2][2], P_glm[2][3],
-        P_glm[3][0], P_glm[3][1], P_glm[3][2], P_glm[3][3];
-    auto [ti, z, abc ] = raytrace_triangle(xm, P, globals.mesh->mass_x, globals.rendered_mesh->indices);
+        auto P_glm = projection * view;
+        Matrix4d P;
+        P << P_glm[0][0], P_glm[0][1], P_glm[0][2], P_glm[0][3],
+            P_glm[1][0], P_glm[1][1], P_glm[1][2], P_glm[1][3],
+            P_glm[2][0], P_glm[2][1], P_glm[2][2], P_glm[2][3],
+            P_glm[3][0], P_glm[3][1], P_glm[3][2], P_glm[3][3];
+        auto [ti, z, abc] = raytrace_triangle(xm, P, globals.mesh->mass_x, globals.rendered_mesh->indices);
+
+        indices_highlight = ti;
+        spdlog::info("indice = {}", indices_highlight);
+        auto l = P_glm * glm::vec4(-0.5f, -0.5f, -0.5f, 1.0f);
+        auto u = P_glm * glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
+        spdlog::info("l, u = ({}, {}), ({}, {}), xm = ({}, {}) \n\n", l[0] / l[3],  l[1] / l[3], u[0] / u[3], u[1] / u[3], xm[0], xm[1]);
+    }
 }
 
 vector<unsigned> bar_geometry(vector<vec3> &xcs)
