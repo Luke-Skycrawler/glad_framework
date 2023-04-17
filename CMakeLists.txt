@@ -1,6 +1,8 @@
 # CMakeLists.txt
 cmake_minimum_required(VERSION 3.0)
+set(CMAKE_CXX_STANDARD 17)
 project(framework CXX)
+option(LIBIGL_USE_STATIC_LIBRARY     "Use libIGL as static librarie" ON)
 
 # Find dependencies provided by vcpkg (via vcpkg.cmake)
 find_package(glfw3 CONFIG REQUIRED)
@@ -9,6 +11,7 @@ find_package(assimp CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
 find_package (Eigen3 3.3 NO_MODULE)
 find_package(spdlog REQUIRED)
+find_package(LIBIGL CONFIG REQUIRED)
 set(PROJECT_NAME main)
 # set(TETGEN_DIRS "D:/0IOS Games/OneDrive - zju.edu.cn/Curriculum/noble research/ref repos/tetgen")
 # find_library(TETGEN_LIB tetgen PATHS "${TETGEN_DIRS}/build/Debug")
@@ -55,7 +58,7 @@ target_include_directories(main PRIVATE
     # ${TETGEN_DIRS})
 
 target_sources(main PRIVATE ${ALL_FILES})
-target_link_libraries(main PRIVATE glfw assimp::assimp glad::glad glm::glm Eigen3::Eigen spdlog::spdlog_header_only) # ${TETGEN_LIB})
+target_link_libraries(main PRIVATE glfw assimp::assimp glad::glad glm::glm Eigen3::Eigen spdlog::spdlog_header_only igl::core) # ${TETGEN_LIB})
 
 # set_property(TARGET main PROPERTY CXX_STANDARD 20)
 

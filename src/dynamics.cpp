@@ -352,6 +352,36 @@ void implicit_euler(SparseMatrix<double> &sparse_matrix, const map<array<int, 2>
     }
 }
 
+void extract_edges(vector<Edge>& edges, const MatrixXi& T) {
+    static set<array<unsigned, 2>> e;
+    e.clear();
+    edges.resize(0);
+    static const auto insert = [&](unsigned a, unsigned b)
+    {
+        e.insert({min(a, b), max(a, b)});
+    };
+    int n_tets = T.rows();
+    for (int i = 0; i < n_tets; i++)
+    {
+        auto t0 = T(i,0), 
+            t1 = T(i, 1), 
+            t2 = T(i, 2),
+            t3 = T(i, 3);
+        insert(t0, t1);
+        insert(t1, t2);
+        insert(t0, t2);
+
+        insert(t0, t3);
+        insert(t1, t3);
+        insert(t2, t3);
+
+    }
+    edges.reserve(e.size());
+    for (auto &ei : e)
+    {
+        edges.push_back({0.0, int(ei[0]), int(ei[1])});
+    }
+}
 void extract_edges(vector<Edge> &edges, const vector<unsigned> indices)
 {
     static set<array<unsigned, 2>> e;

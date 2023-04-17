@@ -12,8 +12,10 @@ struct shayMesh
     vector<Vector3f> vertices;
     vector<vRender> vs;
     vector<unsigned> indices, _indices;
+    MatrixXi E;
     int nv, nf, nvn;
     shayMesh(const string &filename);
+    shayMesh(string node_file, string tet_file, vector<Edge> &edges);
     shayMesh(const vector<vec3> &xcs, const vector<unsigned> &indices);
     unsigned vao, vbo, ebo;
     void setupMesh();

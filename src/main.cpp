@@ -13,6 +13,8 @@
 #include "light.h"
 #include "dynamics.h"
 #include "globals.h"
+#include <igl/boundary_facets.h>
+#include <igl/edges.h>
 //#include <tetgen.h>
 
 
@@ -42,6 +44,10 @@ bool concentric = true, implicit = false;
 #include <sstream>
 #include <string>
 #include <vector>
+
+MatrixXi readTetFile(string filename);
+MatrixXf readNodeFile(string filename);
+
 vector<unsigned> bar_geometry(vector<vec3> &xcs);
 vector<Eigen::Vector3f> read_obj(const string &filename,
                                  vector<unsigned> &indices)
@@ -104,7 +110,35 @@ shayMesh::shayMesh(const vector<vec3> &xcs, const vector<unsigned> &indices)
     this->indices = indices;
     setupMesh();
 }
+void extract_edges(vector<Edge>& edges, const MatrixXi& T);
 
+shayMesh::shayMesh(string node_file, string tet_file, std::vector<Edge> &edges)
+{
+    auto tets = readTetFile(tet_file);
+    auto nodes = readNodeFile(node_file);
+    nv = nodes.rows();
+    MatrixXi F, J, K;
+
+    igl::boundary_facets(tets, F, J, K);
+    //igl::edges(tets, this -> E);
+    extract_edges(edges,tets);
+    nf = F.rows();
+    
+    vertices.resize(nv);
+    //_indices.resize(nf * 3);
+    indices.resize(nf * 3);
+    for (int i = 0; i < nv; i++)
+    {
+        vertices[i] = nodes.row(i).transpose();
+    }
+    for (int i = 0; i < nf; i++)
+    {
+        indices[3 * i + 0] = F(i,0);
+        indices[3 * i + 1] = F(i,1);
+        indices[3 * i + 2] = F(i,2);
+    }
+    setupMesh();
+}
 void shayMesh::setupMesh()
 {
     // create buffers/arrays
@@ -240,14 +274,24 @@ void reset_globals()
 #define CUBE_CASE
 #ifdef CUBE_CASE
     // shayMesh rendered_mesh("../src/assets/cube.obj");
-    auto body2_ptr = new shayMesh("../src/assets/dragon_8kface.obj");
+    // auto body2_ptr = new shayMesh("../src/assets/dragon_8kface.obj");
+    vector<Edge> edges;
+    auto body2_ptr = new shayMesh("../src/assets/dragon/dragon.node", "../src/assets/dragon/dragon.ele", edges);
     // auto body2_ptr = new shayMesh("../src/assets/cube.obj");
     shayMesh &rendered_mesh = *body2_ptr;
     auto &vertices{rendered_mesh.vertices};
 
-    vector<Edge> edges;
     // extract_edges(edges, body.meshes[0].indices);
+    #define NODE
+    #ifdef NODE
+    auto &E {body2_ptr -> E};
+    for (int i = 0; i < E.size(); i++)
+    {
+        edges.push_back({0.0, E(i, 0), E(i,1)});
+    }
+    #else
     extract_edges(edges, rendered_mesh.indices);
+    #endif
     vector<vec3> velocity, position;
     vector<bool> is_static;
 
@@ -1057,4 +1101,57 @@ void shayMesh::compute_normals(bool clockwise)
     }
     for (unsigned int i = 0; i < nvn; i++)
         vs[i].normals = vs[i].normals.normalized();
+}
+
+MatrixXf readNodeFile(string filename) {
+    ifstream file(filename);
+
+    if (!file) {
+        cerr << "Error: Could not open file " << filename << endl;
+        return MatrixXf::Zero(0, 0);
+    }
+
+    int num_vertices, dim, num_attrs, marker;
+    file >> num_vertices >> dim >> num_attrs >> marker;
+
+    MatrixXf V(num_vertices, 3);
+
+    for (int i = 0; i < num_vertices; i++) {
+        float x, y, z;
+        int index, is_surface;
+
+        file >> index >> x >> y >> z >> is_surface;
+
+        V.row(i) << x, y, z;
+    }
+
+    file.close();
+    return V;
+}
+
+MatrixXi readTetFile(string filename) {
+    vector<Vector4i> tets;
+    ifstream file(filename);
+
+    if (!file) {
+        cerr << "Error: Could not open file " << filename << endl;
+        return MatrixXi::Zero(0, 0);
+    }
+
+    int num_tets, num_corners, num_attrs;
+    file >> num_tets >> num_corners >> num_attrs;
+
+    MatrixXi T(num_tets, 4);
+
+    for (int i = 0; i < num_tets; i++) {
+        int v1, v2, v3, v4;
+
+        file >> v1 >> v2 >> v3 >> v4;
+
+        // Subtract 1 from vertex indices to convert from 1-indexing to 0-indexing
+        T.row(i) << v1 - 1, v2 - 1, v3 - 1, v4 - 1;
+    }
+
+    file.close();
+    return T;
 }
