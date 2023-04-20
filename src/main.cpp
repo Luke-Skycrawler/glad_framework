@@ -128,10 +128,10 @@ shayMesh::shayMesh(string node_file, string tet_file, std::vector<Edge> &edges)
     //_indices.resize(nf * 3);
     indices.resize(nf * 3);
     auto max_coef = nodes.maxCoeff();
-    
+    Vector3f com = nodes.colwise().mean() / max_coef;
     for (int i = 0; i < nv; i++)
     {
-        vertices[i] = nodes.row(i).transpose() / max_coef;
+        vertices[i] = nodes.row(i).transpose() / max_coef - com;
     }
     for (int i = 0; i < nf; i++)
     {
