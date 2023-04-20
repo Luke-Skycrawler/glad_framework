@@ -1,5 +1,5 @@
 {
-    "ks": 1e8,
+    "ks": 1e5,
     "bound": 1.0,
     "static": false,
     "gravity": false,

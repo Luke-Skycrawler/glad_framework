@@ -24,7 +24,7 @@ void compute_force(VectorXd &b, const VectorXd &v_plus)
         xji += (v_plus.segment<3>(3 * j) - v_plus.segment<3>(3 * i)) * dt;
 
         assert(xji.squaredNorm() > 0.0);
-        vec3 fi = globals.config["ks"] * (xji - e.l0 * (xji).normalized());
+        vec3 fi = globals.config["ks"] * (xji - e.l0 * (xji).normalized()) / e.l0;
         if (fi.squaredNorm() > 0.01)
         {
             // cout << fi.transpose() << "\n";
@@ -113,11 +113,11 @@ mat3 compute_single_spring_K(Edge &e, const vec3 &vi, const vec3 &vj, bool use_v
     double l2 = xji.squaredNorm();
     double l = sqrt(l2);
     mat3 term1 = mat3::Identity(3, 3) - K / l2;
-    mat3 K_spring = globals.config["ks"] * (-mat3::Identity(3, 3) + (e.l0 / l) * term1);
-    // mat3 K_damp = -(kd / l) * vji.transpose() * term1;
+    mat3 K_spring = globals.config["ks"] * (-mat3::Identity(3, 3) + (e.l0 / l) * term1) / e.l0;
+    // mat3 K_damp = -(kd /  l) * vji.transpose() * term1;
     if (l < e.l0) {
         auto xji_normalized = xji.normalized();
-        K_spring = -xji_normalized * xji_normalized.transpose() * globals.config["ks"];
+        K_spring = -xji_normalized * xji_normalized.transpose() * globals.config["ks" ] / e.l0;
     }
     return K_spring;
     // return K_spring + K_damp;

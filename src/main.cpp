@@ -127,9 +127,11 @@ shayMesh::shayMesh(string node_file, string tet_file, std::vector<Edge> &edges)
     vertices.resize(nv);
     //_indices.resize(nf * 3);
     indices.resize(nf * 3);
+    auto max_coef = nodes.maxCoeff();
+    
     for (int i = 0; i < nv; i++)
     {
-        vertices[i] = nodes.row(i).transpose();
+        vertices[i] = nodes.row(i).transpose() / max_coef;
     }
     for (int i = 0; i < nf; i++)
     {
@@ -1144,9 +1146,9 @@ MatrixXi readTetFile(string filename) {
     MatrixXi T(num_tets, 4);
 
     for (int i = 0; i < num_tets; i++) {
-        int v1, v2, v3, v4;
+        int _, v1, v2, v3, v4;
 
-        file >> v1 >> v2 >> v3 >> v4;
+        file >> _ >>  v1 >> v2 >> v3 >> v4;
 
         // Subtract 1 from vertex indices to convert from 1-indexing to 0-indexing
         T.row(i) << v1 - 1, v2 - 1, v3 - 1, v4 - 1;
