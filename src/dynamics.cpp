@@ -4,7 +4,9 @@
 #include <iostream>
 #include <set>
 #include "globals.h"
-
+#ifdef EIGEN_USE_MKL_ALL
+#include <Eigen/PardisoSupport>
+#endif
 extern Globals globals;
 static const double M = 1.0;
 
@@ -306,7 +308,13 @@ void implicit_euler(SparseMatrix<double> &sparse_matrix, const map<array<int, 2>
         // 1st iter v_plus = 0, b = M * v_t + dt * f(x_t)
 
         compute_A(sparse_matrix, lut, v_plus, iter == 0);
+        #ifdef EIGEN_USE_MKL_ALL
+        // SimplicialLDLT<SparseMatrix<double>> ldlt_solver;
+        PardisoLDLT<SparseMatrix<double>> ldlt_solver;
+
+        #else
         SimplicialLDLT<SparseMatrix<double>> ldlt_solver;
+        #endif
         ldlt_solver.compute(sparse_matrix);
         auto dv = ldlt_solver.solve(b);
         double residue;

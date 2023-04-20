@@ -15,6 +15,7 @@
 #include "globals.h"
 #include <igl/boundary_facets.h>
 #include <igl/edges.h>
+#include <omp.h>
 //#include <tetgen.h>
 
 
@@ -337,6 +338,10 @@ void reset_globals()
 
 int main()
 {
+
+    int n_proc = omp_get_num_procs();
+    omp_set_num_threads(n_proc);
+    setNbThreads(n_proc);
     // glfw: initialize and configure
     // ------------------------------------------------------------------
     glfwInit();
